@@ -1,0 +1,381 @@
+name: 💬 Batepapo Microservice - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: ['src/**', 'pom.xml', 'Dockerfile', '.github/workflows/**']
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+        - auto
+        - staging
+        - production
+
+# Controle de concorrência para evitar conflitos
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.environment || 'auto' }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  SERVICE_NAME: batepapo
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+  attestations: write
+
+jobs:
+  # ===== BUILD & TEST =====
+  build-and-test:
+    runs-on: ubuntu-latest
+    name: 🏗️ Build and Test
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: ☕ Setup Java 24
+        uses: actions/setup-java@v4
+        with:
+          java-version: '24'
+          distribution: 'temurin'
+          cache: maven
+          
+      - name: 🔍 Verify Maven wrapper
+        run: |
+          chmod +x ./mvnw
+          ./mvnw --version
+          
+      - name: 🧪 Run unit tests
+        run: ./mvnw clean test -Dspring.profiles.active=test
+        
+      - name: 🏗️ Build application
+        run: ./mvnw clean package -DskipTests -Dspring.profiles.active=production
+        
+      - name: 📦 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: batepapo-microservice-jar
+          path: target/*.jar
+          retention-days: 7
+
+  # ===== BUILD & PUSH IMAGE =====
+  build-image:
+    runs-on: ubuntu-latest
+    name: 🐳 Build Docker Image
+    needs: build-and-test
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+      attestations: write
+      
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 📋 Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value={{branch}}-{{date 'YYYYMMDD-HHmmss'}}
+            type=raw,value=prod-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=teste-latest,enable=${{ github.ref == 'refs/heads/develop' }}
+          labels: |
+            org.opencontainers.image.title=Batepapo Microservice
+            org.opencontainers.image.description=Chat and real-time communication microservice
+            org.opencontainers.image.service=${{ env.SERVICE_NAME }}
+            
+      - name: 🏗️ Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max
+          build-args: |
+            SERVICE_NAME=${{ env.SERVICE_NAME }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp || github.run_id }}
+            VCS_REF=${{ github.sha }}
+            VERSION=1.0.0
+
+  # ===== SIGN IMAGE WITH COSIGN =====
+  sign-image:
+    runs-on: ubuntu-latest
+    name: ✍️ Sign Container Image
+    needs: build-image
+    permissions:
+      id-token: write
+      packages: write
+      contents: read
+    
+    steps:
+      - name: 🔐 Install Cosign
+        uses: sigstore/cosign-installer@v3
+        
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: ✍️ Sign image with keyless signing
+        run: |
+          echo "✍️ Signing image with keyless cosign..."
+          # Use the first tag from the build output (more reliable than digest)
+          IMAGE_TAG=$(echo '${{ needs.build-image.outputs.image-tags }}' | head -n1)
+          echo "Signing image: $IMAGE_TAG"
+          cosign sign --yes "$IMAGE_TAG"
+          echo "✅ Image signed successfully"
+
+  # ===== FETCH AZURE SECRETS =====
+  fetch-azure-secrets:
+    runs-on: ubuntu-latest
+    name: 🔐 Fetch Azure Key Vault Secrets
+    needs: [build-image, sign-image]
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: 🔐 Login to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🔍 Validate Azure Key Vault Connection
+        id: fetch-secrets
+        run: |
+          echo "🔍 Validating Azure Key Vault connection (OIDC)..."
+          
+          # Extract vault name from endpoint (masked)
+          echo "🏪 Vault: [VAULT_NAME_MASKED_FOR_SECURITY]"
+          
+          # Validate connection without exposing values
+          VAULT_NAME=$(echo "${{ secrets.AZURE_KEYVAULT_ENDPOINT }}" | sed 's|https://||' | sed 's|\.vault\.azure\.net/||')
+          az keyvault secret list --vault-name "$VAULT_NAME" --query 'length([])' -o tsv > /dev/null
+          
+          echo "✅ Azure Key Vault secrets validated for deployment"
+  # ===== DEPLOY TO STAGING =====
+  deploy-staging:
+    runs-on: ubuntu-latest
+    name: 🚀 Deploy to Staging
+    needs: [build-image, fetch-azure-secrets]
+    if: github.ref == 'refs/heads/develop'
+    # environment: staging # Commented out - configure environments in GitHub repo settings
+    
+    steps:
+      - name: 🚀 Deploy to staging server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          script: |
+            cd /opt/conexao-microservices
+            echo "Deploying batepapo microservice to staging..."
+            
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+            
+            # Stop existing container
+            docker stop batepapo-microservice || true
+            docker rm batepapo-microservice || true
+            
+            # Start with Azure Key Vault configuration
+            docker run -d \
+              --name batepapo-microservice \
+              --network conexao-network \
+              --restart unless-stopped \
+              -p 8083:8083 \
+              --health-cmd="curl -f http://localhost:8083/actuator/health || exit 1" \
+              --health-interval=60s \
+              --health-timeout=30s \
+              --health-retries=3 \
+              --health-start-period=120s \
+              -v /run/secrets:/run/secrets:ro \
+              -e SPRING_PROFILES_ACTIVE=staging,azure \
+              -e ENVIRONMENT=staging \
+              -e SERVER_PORT=8083 \
+              -e SPRING_CONFIG_IMPORT=optional:configtree:/run/secrets/ \
+              -e TZ=America/Sao_Paulo \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+            
+            # Health check
+            echo "⏳ Waiting for service to be healthy..."
+            sleep 30
+            
+            for i in {1..10}; do
+              if curl -f http://localhost:8083/actuator/health; then
+                echo "✅ Health check passed"
+                break
+              fi
+              echo "⏳ Health check failed, retrying in 10s..."
+              sleep 10
+              if [ $i -eq 10 ]; then
+                echo "❌ Health check failed after 10 retries"
+                docker logs batepapo-microservice --tail 50
+                exit 1
+              fi
+            done
+            
+            # Cleanup old images
+            docker image prune -f
+
+  # ===== DEPLOY TO PRODUCTION =====
+  deploy-production:
+    runs-on: ubuntu-latest
+    name: 🌟 Deploy to Production
+    needs: [build-image, fetch-azure-secrets]
+    if: github.ref == 'refs/heads/main'
+    # environment: production # Commented out - configure environments in GitHub repo settings
+    # url: https://batepapo.conexaodesorte.com.br
+    
+    steps:
+      - name: 🌟 Deploy to production server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: 22
+          script: |
+            cd /opt/conexao-microservices
+            echo "Deploying batepapo microservice to production..."
+            
+            # Create backup of current version
+            docker tag batepapo-microservice:current batepapo-microservice:backup-$(date +%Y%m%d-%H%M%S) || true
+            
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            
+            # Stop current container
+            docker stop batepapo-microservice || true
+            docker rm batepapo-microservice || true
+            
+            # Start with Azure Key Vault configuration
+            docker run -d \
+              --name batepapo-microservice \
+              --network conexao-network \
+              --restart unless-stopped \
+              -p 8083:8083 \
+              --health-cmd="curl -f http://localhost:8083/actuator/health || exit 1" \
+              --health-interval=60s \
+              --health-timeout=30s \
+              --health-retries=3 \
+              --health-start-period=120s \
+              -v /run/secrets:/run/secrets:ro \
+              -e SPRING_PROFILES_ACTIVE=prod,azure \
+              -e ENVIRONMENT=production \
+              -e SERVER_PORT=8083 \
+              -e SPRING_CONFIG_IMPORT=optional:configtree:/run/secrets/ \
+              -e TZ=America/Sao_Paulo \
+              --label "traefik.enable=true" \
+              --label "traefik.docker.network=conexao-network" \
+              --label "traefik.http.routers.batepapo.rule=Host(\`batepapo.conexaodesorte.com.br\`)" \
+              --label "traefik.http.routers.batepapo.entrypoints=websecure" \
+              --label "traefik.http.routers.batepapo.tls.certresolver=letsencrypt" \
+              --label "traefik.http.services.batepapo.loadbalancer.server.port=8083" \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            
+            # Health check with retry
+            echo "⏳ Waiting for service to be healthy..."
+            sleep 30
+            
+            for i in {1..10}; do
+              if curl -f https://batepapo.conexaodesorte.com.br/actuator/health; then
+                echo "✅ Health check passed"
+                break
+              fi
+              echo "⏳ Health check failed, retrying in 10s..."
+              sleep 10
+              if [ $i -eq 10 ]; then
+                echo "❌ Health check failed after 10 retries, rolling back..."
+                docker stop batepapo-microservice || true
+                docker rm batepapo-microservice || true
+                docker run -d \
+                  --name batepapo-microservice \
+                  --network conexao-network \
+                  --restart unless-stopped \
+                  -p 8083:8083 \
+                  batepapo-microservice:backup-$(date +%Y%m%d) 2>/dev/null || echo "Rollback image not available"
+                exit 1
+              fi
+            done
+            
+            # Cleanup old images
+            docker image prune -f
+            
+            echo "✅ Batepapo microservice deployed successfully to production!"
+
+  # ===== NOTIFICATION =====
+  notify:
+    runs-on: ubuntu-latest
+    name: 📢 Notification
+    if: always()
+    needs: [build-and-test, build-image, fetch-azure-secrets, deploy-staging, deploy-production]
+    
+    steps:
+      - name: 📢 Notify deployment status
+        uses: 8398a7/action-slack@v3
+        if: always() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          channel: '#ci-cd-notifications'
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+          custom_payload: |
+            {
+              username: 'GitHub Actions',
+              icon_emoji: ':speech_balloon:',
+              attachments: [{
+                color: '${{ job.status }}' === 'success' ? 'good' : '${{ job.status }}' === 'failure' ? 'danger' : 'warning',
+                fields: [{
+                  title: '💬 Batepapo Microservice',
+                  value: `Status: ${{ job.status }}\nBranch: ${process.env.AS_REF}\nCommit: ${process.env.AS_COMMIT}`,
+                  short: true
+                }]
+              }]
+            }

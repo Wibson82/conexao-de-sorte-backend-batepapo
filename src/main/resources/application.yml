@@ -1,0 +1,379 @@
+spring:
+  application:
+    name: batepapo
+    
+  profiles:
+    active: dev
+    
+  r2dbc:
+    url: r2dbc:mysql://localhost:3306/conexao_sorte_batepapo
+    username: ${DB_USERNAME:conexao_sorte}
+    password: ${DB_PASSWORD:senha123}
+    pool:
+      enabled: true
+      initial-size: 10
+      max-size: 50
+      max-idle-time: 30m
+      max-acquire-time: 60s
+      
+  # Flyway para migrations (usa JDBC)
+  flyway:
+    enabled: true
+    url: jdbc:mysql://localhost:3306/conexao_sorte_batepapo
+    user: ${DB_USERNAME:conexao_sorte}
+    password: ${DB_PASSWORD:senha123}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: false
+    
+  # Cache reativo e messaging (Redis)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 20
+          max-idle: 8
+          min-idle: 2
+          
+  # Security JWT
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://auth.conexaodesorte.com}
+
+server:
+  port: ${SERVER_PORT:8083}
+  shutdown: graceful
+  
+  # SSL/TLS Configuration
+  ssl:
+    enabled: ${SSL_ENABLED:false}
+    key-store: ${SSL_KEYSTORE_PATH:}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:}
+    key-store-type: PKCS12
+    
+  netty:
+    connection-timeout: 20s
+    h2c-max-content-length: 0B
+    
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+      cors:
+        allowed-origins: "*"
+        allowed-methods: GET
+        
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      probes:
+        enabled: true
+        
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+      
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+        step: 60s
+    web:
+      server:
+        request:
+          autotime:
+            enabled: true
+            percentiles: 0.5,0.95,0.99
+            
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${TRACING_PROBABILITY:0.1}
+
+# Paginação e Performance
+pagination:
+  default-size: 20
+  max-size: 100
+  default-sort: dataEnvio,desc
+  
+# Cache Configuration
+cache:
+  mensagens:
+    ttl: 180  # 3 minutos
+  salas:
+    ttl: 600  # 10 minutos
+  usuarios-online:
+    ttl: 30   # 30 segundos
+  historico:
+    ttl: 300  # 5 minutos
+
+# CORS Configuration
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,https://app.conexaodesorte.com}
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# Rate Limiting específico para chat
+rate-limit:
+  enabled: true
+  default-requests-per-minute: 60
+  endpoints:
+    "/api/chat/mensagem":
+      requests-per-minute: 20    # Limitar spam de mensagens
+      burst-capacity: 30
+    "/api/chat/stream/**":
+      requests-per-minute: 10    # Limitar conexões SSE
+      burst-capacity: 15
+    "/api/chat/mensagens/**":
+      requests-per-minute: 40    # Histórico de mensagens
+      burst-capacity: 60
+
+# Security Headers
+security:
+  headers:
+    content-security-policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ws: wss:"
+    x-content-type-options: nosniff
+    x-frame-options: DENY
+    x-xss-protection: "1; mode=block"
+    strict-transport-security: "max-age=31536000; includeSubDomains"
+
+# Feature Flags
+features:
+  batepapo-microservice: ${FEATURE_BATEPAPO_MS:false}
+  websocket-support: ${FEATURE_WEBSOCKET:true}
+  sse-support: ${FEATURE_SSE:true}
+  message-persistence: ${FEATURE_MESSAGE_PERSISTENCE:true}
+  redis-streams: ${FEATURE_REDIS_STREAMS:true}
+  user-presence: ${FEATURE_USER_PRESENCE:true}
+  message-history: ${FEATURE_MESSAGE_HISTORY:true}
+  room-management: ${FEATURE_ROOM_MANAGEMENT:true}
+  audit-logging: ${FEATURE_AUDIT_LOGGING:true}
+  metrics-collection: ${FEATURE_METRICS:true}
+
+# Chat Configuration
+chat:
+  max-message-length: 500
+  max-rooms-per-user: 5
+  message-retention-days: 30
+  online-timeout-minutes: 5
+  heartbeat-interval-seconds: 30
+  max-connections-per-user: 3
+  room-types:
+    - "geral"
+    - "resultados"
+    - "dicas"
+    - "suporte"
+  
+# Redis Streams Configuration
+redis:
+  streams:
+    chat-messages: "chat:messages"
+    user-presence: "chat:presence"  
+    room-events: "chat:rooms"
+    consumer-group: "batepapo-service"
+    consumer-name: ${HOSTNAME:batepapo-${random.uuid}}
+    max-pending: 1000
+    block-duration: 5000
+
+# WebSocket Configuration  
+websocket:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,https://app.conexaodesorte.com}
+  sockjs:
+    enabled: true
+    heartbeat-time: 25000
+    disconnect-delay: 5000
+  stomp:
+    enabled: true
+    broker-prefix: "/topic"
+    app-prefix: "/app"
+
+# Logging Configuration
+logging:
+  level:
+    br.tec.facilitaservicos.batepapo: ${LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:WARN}
+    org.springframework.r2dbc: ${R2DBC_LOG_LEVEL:WARN}
+    io.r2dbc.mysql: ${MYSQL_LOG_LEVEL:WARN}
+    org.springframework.web.socket: ${WEBSOCKET_LOG_LEVEL:INFO}
+    
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+    
+  file:
+    name: ${LOG_FILE:logs/batepapo.log}
+
+# OpenAPI Documentation
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+  show-actuator: false
+  
+# Resilience4j Configuration
+resilience4j:
+  ratelimiter:
+    instances:
+      chat-service:
+        limit-for-period: 30
+        limit-refresh-period: 1m
+        timeout-duration: 3s
+        
+  circuitbreaker:
+    instances:
+      database:
+        sliding-window-size: 100
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+      redis:
+        sliding-window-size: 50
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 15s
+
+---
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+      
+  r2dbc:
+    url: r2dbc:mysql://localhost:3306/conexao_sorte_batepapo_dev
+    
+  flyway:
+    url: jdbc:mysql://localhost:3306/conexao_sorte_batepapo_dev
+    
+logging:
+  level:
+    br.tec.facilitaservicos.batepapo: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.r2dbc: DEBUG
+    org.springframework.web.socket: DEBUG
+    
+features:
+  batepapo-microservice: true
+  audit-logging: true
+  metrics-collection: true
+
+chat:
+  message-retention-days: 7  # Menor retenção em dev
+
+---
+# Test Profile  
+spring:
+  config:
+    activate:
+      on-profile: test
+      
+  r2dbc:
+    url: r2dbc:mysql://localhost:3306/conexao_sorte_batepapo_test
+    
+  flyway:
+    url: jdbc:mysql://localhost:3306/conexao_sorte_batepapo_test
+    clean-disabled: false
+    
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+          
+logging:
+  level:
+    br.tec.facilitaservicos.batepapo: DEBUG
+    
+features:
+  batepapo-microservice: true
+  metrics-collection: false
+
+chat:
+  message-retention-days: 1  # Mínima retenção em testes
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+      
+  r2dbc:
+    url: r2dbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    pool:
+      initial-size: 20
+      max-size: 100
+      
+  flyway:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}
+    user: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    
+server:
+  port: 8083
+  ssl:
+    enabled: true
+    
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+      
+logging:
+  level:
+    br.tec.facilitaservicos.batepapo: INFO
+    root: WARN
+    
+  file:
+    name: /var/log/batepapo/application.log
+    
+features:
+  batepapo-microservice: true
+  websocket-support: true
+  sse-support: true
+  message-persistence: true
+  redis-streams: true
+  user-presence: true
+  message-history: true
+  room-management: true
+  audit-logging: true
+  metrics-collection: true
+  
+rate-limit:
+  default-requests-per-minute: 30
+  endpoints:
+    "/api/chat/mensagem":
+      requests-per-minute: 10  # Mais restritivo em produção
