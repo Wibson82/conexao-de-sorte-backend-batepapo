@@ -4,11 +4,18 @@ spring:
     
   profiles:
     active: dev
+  
+  # Configtree secret management
+  config:
+    import:
+      - optional:configtree:/etc/secrets/azure/
+      - optional:configtree:/mnt/secrets/
+      - optional:file:./secrets.properties
     
   r2dbc:
     url: r2dbc:mysql://localhost:3306/conexao_sorte_batepapo
     username: ${DB_USERNAME:conexao_sorte}
-    password: ${DB_PASSWORD:senha123}
+    password: ${DB_PASSWORD:}  # Removed default password for security
     pool:
       enabled: true
       initial-size: 10
@@ -21,7 +28,7 @@ spring:
     enabled: true
     url: jdbc:mysql://localhost:3306/conexao_sorte_batepapo
     user: ${DB_USERNAME:conexao_sorte}
-    password: ${DB_PASSWORD:senha123}
+    password: ${DB_PASSWORD:}  # Removed default password for security
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
