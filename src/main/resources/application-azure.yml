@@ -100,15 +100,20 @@ app:
       join-leave-enabled: false
 
   # Redis para sessões WebSocket e cache
-  redis:
-    url: ${REDIS_URL:redis://redis:6379}
-    password: ${REDIS_PASSWORD:}
-    timeout: 2000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:1}  # DB 1 para batepapo
+      timeout: 2000ms
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 3000ms
 
 # ===== WEBSOCKET CONFIGURATION =====
 websocket:
