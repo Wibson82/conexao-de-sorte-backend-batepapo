@@ -110,9 +110,9 @@ app:
       lettuce:
         pool:
           enabled: true
-          max-active: 8
+          max-active: 20  # Chat precisa de mais conexões simultâneas
           max-idle: 8
-          min-idle: 0
+          min-idle: 2     # Manter conexões mínimas ativas
           max-wait: 3000ms
 
 # ===== WEBSOCKET CONFIGURATION =====
