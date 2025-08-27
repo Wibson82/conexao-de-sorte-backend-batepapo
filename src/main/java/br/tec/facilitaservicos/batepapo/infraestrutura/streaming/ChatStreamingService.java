@@ -3,6 +3,7 @@ package br.tec.facilitaservicos.batepapo.infraestrutura.streaming;
 import java.time.Duration;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
@@ -49,7 +50,7 @@ public class ChatStreamingService {
     @Value("${redis.streams.block-duration:5000}")
     private long blockDuration;
 
-    public ChatStreamingService(ReactiveRedisTemplate<String, Object> redisTemplate,
+    public ChatStreamingService(@Qualifier("reactiveRedisObjectTemplate") ReactiveRedisTemplate<String, Object> redisTemplate,
                                ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
