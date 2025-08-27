@@ -3,7 +3,11 @@ spring:
     name: batepapo
     
   profiles:
-    active: dev
+    default: prod
+    # Profiles são sobrescritos via SPRING_PROFILES_ACTIVE no deployment
+  
+  main:
+    allow-bean-definition-overriding: true
   
   # Configtree secret management
   config:
@@ -43,7 +47,7 @@ spring:
       lettuce:
         pool:
           enabled: true
-          max-active: 20
+          max-total: 20
           max-idle: 8
           min-idle: 2
           
@@ -348,7 +352,7 @@ spring:
 server:
   port: 8083
   ssl:
-    enabled: true
+    enabled: ${SSL_ENABLED:false}
     
 management:
   endpoints:
