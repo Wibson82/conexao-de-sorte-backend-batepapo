@@ -93,12 +93,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ steps.image_name.outputs.image_name_lower }}
           tags: |
-            type=ref,event=branch
             type=ref,event=pr
-            type=sha,prefix={{branch}}-,format=short
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value={{branch}}-{{date 'YYYYMMDD-HHmmss'}}
-            type=raw,value=prod-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value={{date 'YYYY-MM-DD-HHmmss'}}-{{sha}},enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=Batepapo Microservice
             org.opencontainers.image.description=Chat and real-time communication microservice
