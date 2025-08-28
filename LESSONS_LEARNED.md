@@ -98,6 +98,12 @@ public ReactiveRedisTemplate<String, Object> reactiveRedisObjectTemplate(...)
 ## 🔄 **HISTÓRICO DE MUDANÇAS**
 
 ### **2025-08-27**
+- ✅ .dockerignore adicionado e versionado
+- ✅ Rede Docker: usar host interno para DB/Redis (ex.: `conexao-mysql`, `conexao-redis`) em vez de `localhost`
+- ✅ Key Vault + configtree (`/run/secrets`) para segredos; aceitar `SPRING_DATASOURCE_*`/`DB_*`
+- ✅ R2DBC (r2dbc://) e Flyway (jdbc://) com URLs separadas quando aplicável
+- ✅ Desabilitar Redis (auto-config/health) quando o serviço não estiver presente na rede
+### **2025-08-27**
 - ✅ Redis: `redis.url` → `spring.data.redis` + database=1
 - ✅ Pool: max-active 8→20, min-idle 0→2 (otimizado para chat)
 - ✅ Templates: Resolvido conflito String/String vs String/Object
