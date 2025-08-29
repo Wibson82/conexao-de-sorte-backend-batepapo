@@ -1,0 +1,170 @@
+# ============================================================================
+# 🧪 CONFIGURAÇÃO DE TESTES - MICROSERVIÇO BATE-PAPO
+# ============================================================================
+#
+# Configuração otimizada para execução de testes:
+# - Banco H2 em memória
+# - JWT mockeado
+# - Redis embarcado
+# - WebSocket desabilitado
+# - SSE simplificado
+# - Logs minimizados
+#
+# @author Sistema de Migração R2DBC
+# @version 1.0
+# @since 2024
+# ============================================================================
+
+# ========================================
+# 🏷️ CONFIGURAÇÕES GERAIS
+# ========================================
+spring:
+  application:
+    name: batepapo-microservice-test
+  profiles:
+    active: test
+  main:
+    banner-mode: off
+
+# ========================================
+# 🌐 SERVIDOR (PORTA ALEATÓRIA)
+# ========================================
+server:
+  port: 0
+
+# ========================================
+# 🗄️ BANCO DE DADOS (H2 EM MEMÓRIA)
+# ========================================
+spring:
+  r2dbc:
+    url: r2dbc:h2:mem:///testdb?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    
+  # Flyway desabilitado para testes (schema criado via @Sql)
+  flyway:
+    enabled: false
+
+# ========================================
+# 🔐 SEGURANÇA JWT (MOCK)
+# ========================================
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # JWT desabilitado para testes - usar @WithMockUser
+          enabled: false
+
+# ========================================
+# 🚀 REDIS (MOCK/EMBARCADO)
+# ========================================
+spring:
+  data:
+    redis:
+      # Redis embarcado para testes
+      host: localhost
+      port: 6371
+      timeout: 500ms
+
+# ========================================
+# 🚦 FEATURE FLAGS (TESTES)
+# ========================================
+feature:
+  batepapo-ms: true
+  websocket: false  # WebSocket desabilitado para testes
+  sse: true
+  message-persistence: true
+  redis-streams: false  # Redis streams desabilitado para testes
+  rate-limiting: false  # Rate limiting desabilitado para testes
+
+# ========================================
+# 💬 CONFIGURAÇÕES DE CHAT (TESTE)
+# ========================================
+chat:
+  max-message-length: 500
+  max-rooms-per-user: 10
+  message-retention-days: 1  # Retenção mínima para testes
+  online-timeout-minutes: 1  # Timeout reduzido para testes
+  heartbeat-interval-seconds: 5  # Heartbeat mais frequente
+  max-connections-per-user: 5
+
+# ========================================
+# 📝 LOGGING (MINIMIZADO)
+# ========================================
+logging:
+  level:
+    root: WARN
+    br.tec.facilitaservicos.batepapo: DEBUG
+    org.springframework.security: ERROR
+    org.springframework.web: ERROR
+    org.springframework.r2dbc: ERROR
+    reactor.netty: ERROR
+    io.r2dbc: ERROR
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([%thread]){faint} %clr(%logger{36}){cyan} - %msg%n"
+
+# ========================================
+# 📊 ACTUATOR (SIMPLIFICADO)
+# ========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ========================================
+# 🛡️ RESILIENCE4J (DESABILITADO)
+# ========================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      database:
+        enabled: false
+      redis:
+        enabled: false
+        
+  ratelimiter:
+    instances:
+      chat-service:
+        enabled: false
+
+# ========================================
+# 🌐 CORS (PERMISSIVO PARA TESTES)
+# ========================================
+cors:
+  allowed-origins: "*"
+  allowed-methods: "*"
+  allowed-headers: "*"
+  allow-credentials: false
+
+# ========================================
+# 🧪 CONFIGURAÇÕES ESPECÍFICAS DE TESTE
+# ========================================
+test:
+  # Configurações específicas para testes
+  mock-services:
+    redis: true
+    websocket: true
+    sse: true
+  
+  # Dados de teste
+  usuarios-teste:
+    - user123
+    - user456
+    - moderator123
+  
+  salas-teste:
+    - geral
+    - tecnologia
+    - jogos
+  
+  # Timeouts reduzidos
+  timeouts:
+    web: 1s
+    database: 500ms
+    redis: 200ms
+    sse: 30s

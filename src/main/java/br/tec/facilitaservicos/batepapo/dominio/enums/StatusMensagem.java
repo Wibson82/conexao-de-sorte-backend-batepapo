@@ -42,7 +42,17 @@ public enum StatusMensagem {
     /**
      * Mensagem está em fila para processamento
      */
-    PENDENTE("Pendente");
+    PENDENTE("Pendente"),
+    
+    /**
+     * Mensagem removida por moderação
+     */
+    REMOVIDA_MODERACAO("Removida por moderação"),
+    
+    /**
+     * Mensagem em quarentena (aguardando moderação)
+     */
+    QUARENTENA("Em quarentena");
 
     private final String descricao;
 
@@ -103,8 +113,8 @@ public enum StatusMensagem {
         return switch (this) {
             case ENVIADA, ENTREGUE, LIDA -> "success";
             case ERRO -> "danger";
-            case MODERADA, EXCLUIDA -> "warning";
-            case PENDENTE -> "info";
+            case MODERADA, EXCLUIDA, REMOVIDA_MODERACAO -> "warning";
+            case PENDENTE, QUARENTENA -> "info";
         };
     }
 
@@ -117,9 +127,10 @@ public enum StatusMensagem {
             case ENTREGUE -> "✓✓";
             case LIDA -> "👁️";
             case ERRO -> "❌";
-            case MODERADA -> "🔒";
+            case MODERADA, REMOVIDA_MODERACAO -> "🔒";
             case EXCLUIDA -> "🗑️";
             case PENDENTE -> "⏳";
+            case QUARENTENA -> "⚠️";
         };
     }
 

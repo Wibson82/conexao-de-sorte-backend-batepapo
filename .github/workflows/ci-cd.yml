@@ -3,7 +3,6 @@ name: 💬 Batepapo Microservice - CI/CD Pipeline
 on:
   push:
     branches: [ main ]
-    paths: ['src/**', 'pom.xml', 'Dockerfile', '.github/workflows/**']
   pull_request:
     branches: [ main ]
   workflow_dispatch:

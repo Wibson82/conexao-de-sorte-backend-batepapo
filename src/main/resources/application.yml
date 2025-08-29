@@ -19,10 +19,11 @@ spring:
       - optional:configtree:/mnt/secrets/
       - optional:file:./secrets.properties
     
+  # R2DBC via ProxySQL para Read/Write separation automática
   r2dbc:
-    url: r2dbc:mysql://localhost:3306/conexao_sorte_batepapo
-    username: ${DB_USERNAME:conexao_sorte}
-    password: ${DB_PASSWORD:}  # Removed default password for security
+    url: r2dbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}  # ProxySQL para load balancing
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     pool:
       enabled: true
       initial-size: 10
@@ -30,23 +31,23 @@ spring:
       max-idle-time: 30m
       max-acquire-time: 60s
       
-  # Flyway para migrations (usa JDBC)
+  # Flyway para migrations (sempre vai para Master via ProxySQL)
   flyway:
     enabled: true
-    url: jdbc:mysql://localhost:3306/conexao_sorte_batepapo
-    user: ${DB_USERNAME:conexao_sorte}
-    password: ${DB_PASSWORD:}  # Removed default password for security
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}  # ProxySQL roteia DDL para Master
+    user: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
     
-  # Cache reativo e messaging (Redis)
+  # Cache reativo e messaging (Redis da conexao-redis-infrastructure)
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      database: ${REDIS_DB:1}  # DB 1 para batepapo
+      host: ${REDIS_HOST}  # Hostname na rede conexao-network
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}  # Obrigatório no redis da infraestrutura
+      database: ${REDIS_DB_CHAT}  # DB específico para batepapo
       timeout: 2000ms
       lettuce:
         pool:
@@ -65,7 +66,7 @@ spring:
           issuer-uri: ${JWT_ISSUER:https://auth.conexaodesorte.com}
 
 server:
-  port: ${SERVER_PORT:8083}
+  port: ${SERVER_PORT:8079}
   shutdown: graceful
   
   # SSL/TLS Configuration
@@ -124,6 +125,9 @@ management:
     enabled: true
     sampling:
       probability: ${TRACING_PROBABILITY:0.1}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 
 # Paginação e Performance
 pagination:
@@ -252,6 +256,24 @@ springdoc:
     tagsSorter: alpha
   show-actuator: false
   
+# Distributed Tracing (merged with main logging section above)
+    
+# Microservices Integration URLs
+services:
+  auth:
+    url: ${AUTH_SERVICE_URL:http://localhost:8081}
+    endpoints:
+      validate: ${AUTH_VALIDATE_ENDPOINT:/api/v1/auth/validate}
+      users: ${AUTH_USERS_ENDPOINT:/api/v1/users}
+  notifications:
+    url: ${NOTIFICATIONS_SERVICE_URL:http://localhost:8084}
+    endpoints:
+      send: ${NOTIFICATIONS_SEND_ENDPOINT:/api/v1/notifications}
+  audit:
+    url: ${AUDIT_SERVICE_URL:http://localhost:8085}
+    endpoints:
+      events: ${AUDIT_EVENTS_ENDPOINT:/api/v1/audit/events}
+
 # Resilience4j Configuration
 resilience4j:
   ratelimiter:
@@ -355,7 +377,7 @@ spring:
     password: ${DB_PASSWORD}
     
 server:
-  port: 8083
+  port: 8079
   ssl:
     enabled: ${SSL_ENABLED:false}
     
