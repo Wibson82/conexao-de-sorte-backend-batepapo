@@ -23,6 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: release
     container_name: batepapo-microservice
     restart: unless-stopped
     ports:

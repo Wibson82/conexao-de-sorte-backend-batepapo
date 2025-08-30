@@ -121,3 +121,9 @@ EXPOSE 5005
 
 # Comando para debug
 CMD ["sh", "-c", "echo 'Starting CHAT service in DEBUG mode on port 5005' && java $JAVA_OPTS -jar app.jar"]
+
+# === ESTÁGIO FINAL: RELEASE (Padrão) ===
+# Garante que o build padrão (sem --target) produza a imagem de runtime
+FROM runtime AS release
+ENTRYPOINT ["dumb-init", "--", "java"]
+CMD ["-jar", "app.jar"]
