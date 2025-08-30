@@ -265,13 +265,13 @@ public class ChatService {
     public Mono<MensagemDto> editarMensagem(String mensagemId, String novoConteudo, String userId) {
         logger.debug("✏️ Usuário {} editando mensagem {}", userId, mensagemId);
 
-        return mensagemRepository.findById(mensagemId)
+        return mensagemRepository.findById(parseMensagemId(mensagemId))
                 .filter(mensagem -> userId.equals(mensagem.getAutorId()) || isUserModerator(userId))
                 .switchIfEmpty(Mono.error(new RuntimeException("Não autorizado a editar esta mensagem")))
                 .flatMap(mensagem -> {
                     mensagem.setConteudo(novoConteudo);
                     mensagem.setEditada(true);
-                    mensagem.setTimestampEdicao(LocalDateTime.now());
+                    mensagem.setDataEdicao(LocalDateTime.now());
                     return mensagemRepository.save(mensagem);
                 })
                 .map(this::converterParaDto);
@@ -283,7 +283,7 @@ public class ChatService {
     public Mono<Void> excluirMensagem(String mensagemId, String userId) {
         logger.debug("🗑️ Usuário {} excluindo mensagem {}", userId, mensagemId);
 
-        return mensagemRepository.findById(mensagemId)
+        return mensagemRepository.findById(parseMensagemId(mensagemId))
                 .filter(mensagem -> userId.equals(mensagem.getAutorId()) || isUserModerator(userId))
                 .switchIfEmpty(Mono.error(new RuntimeException("Não autorizado a excluir esta mensagem")))
                 .flatMap(mensagem -> {
@@ -328,27 +328,43 @@ public class ChatService {
     // Métodos auxiliares
 
     private Mono<MensagemR2dbc> criarMensagem(MensagemDto dto, String userId) {
-        return Mono.fromCallable(() -> MensagemR2dbc.builder()
-                .id(UUID.randomUUID().toString())
-                .autorId(userId)
-                .sala(dto.getSala())
-                .conteudo(dto.getConteudo())
-                .tipo(TipoMensagem.TEXTO)
-                .status(StatusMensagem.ATIVA)
-                .timestamp(LocalDateTime.now())
-                .editada(false)
-                .build());
+        return Mono.fromCallable(() -> {
+            MensagemR2dbc m = new MensagemR2dbc(
+                dto.getConteudo(),
+                dto.getUsuarioId(),
+                dto.getUsuarioNome(),
+                dto.getSala()
+            );
+            m.setTipo(TipoMensagem.TEXTO);
+            m.setStatus(StatusMensagem.ENVIADA);
+            m.setDataEnvio(LocalDateTime.now());
+            return m;
+        });
     }
 
     private MensagemDto converterParaDto(MensagemR2dbc mensagem) {
-        return MensagemDto.builder()
-                .id(mensagem.getId())
-                .autorId(mensagem.getAutorId())
-                .sala(mensagem.getSala())
-                .conteudo(mensagem.getConteudo())
-                .timestamp(mensagem.getTimestamp())
-                .editada(mensagem.getEditada())
-                .build();
+        return MensagemDto.completa(
+            mensagem.getId(),
+            mensagem.getConteudo(),
+            mensagem.getUsuarioId(),
+            mensagem.getUsuarioNome(),
+            mensagem.getSala(),
+            mensagem.getTipo(),
+            mensagem.getStatus(),
+            mensagem.getRespostaParaId(),
+            mensagem.getEditada(),
+            mensagem.getDataEnvio(),
+            mensagem.getDataEdicao(),
+            mensagem.getDataCriacao()
+        );
+    }
+
+    private Long parseMensagemId(String mensagemId) {
+        try {
+            return Long.valueOf(mensagemId);
+        } catch (NumberFormatException nfe) {
+            throw new IllegalArgumentException("ID de mensagem inválido: " + mensagemId, nfe);
+        }
     }
 
     private ChatEventDto criarEventoMensagem(MensagemR2dbc mensagem) {
