@@ -16,25 +16,34 @@ import jakarta.validation.constraints.Size;
  * Foca apenas nas funcionalidades essenciais do chat.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "DTO simplificado para mensagens de chat, focado nas funcionalidades essenciais.")
 public record MensagemDtoSimples(
+    @Schema(description = "Identificador único da mensagem", example = "12345")
     Long id,
     
+    @Schema(description = "Conteúdo textual da mensagem", example = "Olá, como vai?")
     @NotBlank(message = "Conteúdo da mensagem é obrigatório")
     @Size(max = 500, message = "Mensagem não pode exceder 500 caracteres")
     String conteudo,
     
+    @Schema(description = "Identificador único do usuário remetente", example = "98765")
     @NotNull(message = "ID do usuário é obrigatório")
     Long usuarioId,
     
+    @Schema(description = "Nome de exibição do usuário remetente", example = "Alice")
     @NotBlank(message = "Nome do usuário é obrigatório")
     String usuarioNome,
     
+    @Schema(description = "Identificador da sala onde a mensagem foi enviada", example = "sala-privada-1")
     @NotBlank(message = "Sala é obrigatória")
     String sala,
     
+    @Schema(description = "Tipo da mensagem", example = "TEXTO", allowableValues = {"TEXTO", "SISTEMA", "IMAGEM"})
     TipoMensagem tipo,
+    @Schema(description = "Status atual da mensagem", example = "ENVIADA", allowableValues = {"ENVIADA", "LIDA", "ERRO"})
     StatusMensagem status,
     
+    @Schema(description = "Data e hora de envio da mensagem", example = "2025-09-01T10:00:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime dataEnvio
 ) {

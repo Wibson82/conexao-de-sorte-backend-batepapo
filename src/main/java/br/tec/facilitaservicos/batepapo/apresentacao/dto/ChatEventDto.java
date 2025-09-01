@@ -17,41 +17,62 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param dados Dados adicionais do evento
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "Representa um evento de chat em tempo real para comunicação via SSE/WebSocket")
 public record ChatEventDto(
+    @Schema(description = "Tipo do evento de chat", example = "NOVA_MENSAGEM")
     TipoEvento tipo,
+    @Schema(description = "Nome ou ID da sala onde ocorreu o evento", example = "sala-geral")
     String sala,
     
+    @Schema(description = "Data e hora exata em que o evento ocorreu", example = "2025-09-01T10:00:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime timestamp,
     
+    @Schema(description = "Dados da mensagem (presente para eventos de mensagem)")
     MensagemDto mensagem,
+    @Schema(description = "Dados do usuário online (presente para eventos de presença)")
     UsuarioOnlineDto usuarioOnline,
+    @Schema(description = "Dados da sala (presente para eventos de sala)")
     SalaDto salaInfo,
+    @Schema(description = "Dados adicionais do evento (estrutura varia conforme o tipo de evento)")
     Object dados
 ) {
     
     /**
      * Tipos de eventos do chat
      */
+    @Schema(description = "Tipos de eventos do chat")
     public enum TipoEvento {
         // Eventos de mensagem
+        @Schema(description = "Nova mensagem enviada")
         NOVA_MENSAGEM,
+        @Schema(description = "Mensagem existente editada")
         MENSAGEM_EDITADA,
+        @Schema(description = "Mensagem excluída")
         MENSAGEM_EXCLUIDA,
         
         // Eventos de usuário
+        @Schema(description = "Usuário entrou na sala")
         USUARIO_ENTROU,
+        @Schema(description = "Usuário saiu da sala")
         USUARIO_SAIU,
+        @Schema(description = "Status de presença do usuário mudou")
         USUARIO_MUDOU_STATUS,
         
         // Eventos de sala
+        @Schema(description = "Nova sala de chat criada")
         SALA_CRIADA,
+        @Schema(description = "Informações da sala atualizadas")
         SALA_ATUALIZADA,
+        @Schema(description = "Sala de chat fechada")
         SALA_FECHADA,
         
         // Eventos de sistema
+        @Schema(description = "Evento de heartbeat para manter a conexão ativa")
         HEARTBEAT,
+        @Schema(description = "Ocorreu um erro no sistema")
         ERRO,
+        @Schema(description = "Sistema em manutenção")
         MANUTENCAO
     }
     

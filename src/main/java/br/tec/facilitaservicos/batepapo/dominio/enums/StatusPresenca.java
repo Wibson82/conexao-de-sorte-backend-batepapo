@@ -12,31 +12,37 @@ public enum StatusPresenca {
     /**
      * Usuário ativo e online
      */
+    @Schema(description = "Usuário ativo e online")
     ONLINE("Online"),
     
     /**
      * Usuário ausente/inativo mas ainda conectado
      */
+    @Schema(description = "Usuário ausente/inativo mas ainda conectado")
     AUSENTE("Ausente"),
     
     /**
      * Usuário ocupado - não quer ser incomodado
      */
+    @Schema(description = "Usuário ocupado - não quer ser incomodado")
     OCUPADO("Ocupado"),
     
     /**
      * Usuário invisível - aparece como offline para outros
      */
+    @Schema(description = "Usuário invisível - aparece como offline para outros")
     INVISIVEL("Invisível"),
     
     /**
      * Usuário desconectado/offline
      */
+    @Schema(description = "Usuário desconectado/offline")
     OFFLINE("Offline"),
     
     /**
      * Conexão perdida/timeout
      */
+    @Schema(description = "Conexão perdida/timeout")
     DESCONECTADO("Desconectado");
 
     private final String descricao;

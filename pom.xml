@@ -28,10 +28,19 @@
         
         <!-- Testcontainers -->
         <testcontainers.version>1.21.3</testcontainers.version>
+        <spring-cloud.version>2025.0.0</spring-cloud.version> <!-- Adicionado para compatibilidade com Spring Boot 3.5.5 -->
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Spring Cloud BOM para compatibilidade -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <!-- Testcontainers BOM -->
             <dependency>
                 <groupId>org.testcontainers</groupId>
@@ -105,7 +114,6 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
-            <version>3.1.0</version>
         </dependency>
         <dependency>
             <groupId>io.github.resilience4j</groupId>

@@ -24,30 +24,41 @@ import jakarta.validation.constraints.NotNull;
  * @param dispositivo Tipo de dispositivo
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "Representa um usuário online em uma sala de chat, com informações de presença.")
 public record UsuarioOnlineDto(
+    @Schema(description = "Identificador único do registro de usuário online", example = "1")
     Long id,
     
+    @Schema(description = "ID do usuário", example = "12345")
     @NotNull(message = "ID do usuário é obrigatório")
     Long usuarioId,
     
+    @Schema(description = "Nome de exibição do usuário", example = "João Silva")
     @NotBlank(message = "Nome do usuário é obrigatório")
     String usuarioNome,
     
+    @Schema(description = "Nome ou ID da sala em que o usuário está online", example = "sala-geral")
     @NotBlank(message = "Sala é obrigatória")
     String sala,
     
+    @Schema(description = "Status de presença do usuário", example = "ONLINE")
     @NotNull(message = "Status de presença é obrigatório")
     StatusPresenca statusPresenca,
     
+    @Schema(description = "Identificador único da sessão do usuário", example = "sessao-xyz-789")
     String sessionId,
     
+    @Schema(description = "Data e hora de entrada do usuário na sala", example = "2025-09-01T09:00:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime dataEntrada,
     
+    @Schema(description = "Data e hora do último heartbeat do usuário", example = "2025-09-01T10:05:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime ultimoHeartbeat,
     
+    @Schema(description = "Tempo que o usuário está online na sala em minutos", example = "65")
     Long tempoOnlineMinutos,
+    @Schema(description = "Tipo de dispositivo usado para acessar o chat", example = "WEB")
     String dispositivo
 ) {
     

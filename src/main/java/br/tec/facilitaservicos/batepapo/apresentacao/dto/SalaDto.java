@@ -7,50 +7,106 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import br.tec.facilitaservicos.batepapo.dominio.enums.StatusSala;
 import br.tec.facilitaservicos.batepapo.dominio.enums.TipoSala;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * DTO reativo para Sala de Chat
+ * DTO reativo para Sala de Chat.
  * 
- * @param id Identificador único da sala
- * @param nome Nome da sala
- * @param descricao Descrição da sala
- * @param tipo Tipo da sala
- * @param status Status da sala
- * @param maxUsuarios Máximo de usuários permitidos
- * @param moderada Se a sala é moderada
- * @param usuariosOnline Número atual de usuários online
- * @param totalMensagens Total de mensagens na sala
- * @param criadaPor ID do usuário que criou a sala
- * @param ultimaAtividade Data/hora da última atividade
- * @param dataCriacao Data de criação da sala
+ * Representa uma sala de bate-papo com todas as informações
+ * necessárias para gerenciamento, controle de acesso e
+ * monitoramento de atividades em tempo real.
+ * 
+ * Principais casos de uso:
+ * - Criação e configuração de salas de chat
+ * - Controle de acesso e limites de usuários
+ * - Monitoramento de atividade e estatísticas
+ * - Moderação e administração de salas
+ * 
+ * Funcionalidades suportadas:
+ * - Diferentes tipos de sala (pública, privada, moderada)
+ * - Controle de capacidade máxima de usuários
+ * - Sistema de moderação com permissões
+ * - Rastreamento de atividade em tempo real
+ * - Estatísticas de uso e engagement
+ * 
+ * Restrições de negócio:
+ * - Nome da sala limitado a 50 caracteres
+ * - Descrição limitada a 200 caracteres
+ * - Capacidade máxima varia por tipo de sala
+ * - Apenas criador e moderadores podem alterar configurações
+ * - Salas inativas são automaticamente arquivadas
+ * 
+ * Relacionamentos:
+ * - Conecta com microserviço de usuários para validação
+ * - Integra com sistema de permissões para moderação
+ * - Vincula com mensagens para estatísticas
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "Sala de bate-papo com configurações e estatísticas de atividade")
 public record SalaDto(
+    @Schema(description = "Identificador único da sala", 
+            example = "42")
     Long id,
     
+    @Schema(description = "Nome da sala de chat", 
+            example = "Sala Geral",
+            required = true,
+            maxLength = 50)
     @NotBlank(message = "Nome da sala é obrigatório")
     @Size(max = 50, message = "Nome da sala não pode exceder 50 caracteres")
     String nome,
     
+    @Schema(description = "Descrição detalhada sobre o propósito da sala", 
+            example = "Espaço para conversas gerais e apresentações",
+            maxLength = 200)
     @Size(max = 200, message = "Descrição não pode exceder 200 caracteres")
     String descricao,
     
+    @Schema(description = "Tipo da sala que define suas características", 
+            example = "PUBLICA",
+            allowableValues = {"PUBLICA", "PRIVADA", "MODERADA", "VIP", "TEMPORARIA"},
+            required = true)
     @NotNull(message = "Tipo da sala é obrigatório")
     TipoSala tipo,
     
+    @Schema(description = "Status atual da sala", 
+            example = "ATIVA",
+            allowableValues = {"ATIVA", "INATIVA", "ARQUIVADA", "MANUTENCAO"})
     StatusSala status,
+    
+    @Schema(description = "Número máximo de usuários permitidos simultaneamente", 
+            example = "100",
+            minimum = "1")
     Integer maxUsuarios,
+    
+    @Schema(description = "Indica se a sala possui moderação ativa", 
+            example = "false")
     Boolean moderada,
+    
+    @Schema(description = "Número atual de usuários conectados à sala", 
+            example = "23",
+            minimum = "0")
     Integer usuariosOnline,
+    
+    @Schema(description = "Total de mensagens enviadas nesta sala", 
+            example = "1847",
+            minimum = "0")
     Long totalMensagens,
+    
+    @Schema(description = "Identificador do usuário que criou a sala", 
+            example = "12345")
     Long criadaPor,
     
+    @Schema(description = "Data e hora da última atividade na sala", 
+            example = "2025-09-01T16:45:30")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime ultimaAtividade,
     
+    @Schema(description = "Data e hora de criação da sala", 
+            example = "2025-08-15T10:20:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime dataCriacao
 ) {

@@ -12,46 +12,55 @@ public enum StatusMensagem {
     /**
      * Mensagem foi enviada com sucesso
      */
+    @Schema(description = "Mensagem foi enviada com sucesso")
     ENVIADA("Enviada"),
     
     /**
      * Mensagem foi entregue aos destinatários
      */
+    @Schema(description = "Mensagem foi entregue aos destinatários")
     ENTREGUE("Entregue"),
     
     /**
      * Mensagem foi lida por pelo menos um destinatário
      */
+    @Schema(description = "Mensagem foi lida por pelo menos um destinatário")
     LIDA("Lida"),
     
     /**
      * Mensagem falhou no envio
      */
+    @Schema(description = "Mensagem falhou no envio")
     ERRO("Erro"),
     
     /**
      * Mensagem foi moderada (oculta/censurada)
      */
+    @Schema(description = "Mensagem foi moderada (oculta/censurada)")
     MODERADA("Moderada"),
     
     /**
      * Mensagem foi excluída pelo usuário ou moderador
      */
+    @Schema(description = "Mensagem foi excluída pelo usuário ou moderador")
     EXCLUIDA("Excluída"),
     
     /**
      * Mensagem está em fila para processamento
      */
+    @Schema(description = "Mensagem está em fila para processamento")
     PENDENTE("Pendente"),
     
     /**
      * Mensagem removida por moderação
      */
+    @Schema(description = "Mensagem removida por moderação")
     REMOVIDA_MODERACAO("Removida por moderação"),
     
     /**
      * Mensagem em quarentena (aguardando moderação)
      */
+    @Schema(description = "Mensagem em quarentena (aguardando moderação)")
     QUARENTENA("Em quarentena");
 
     private final String descricao;

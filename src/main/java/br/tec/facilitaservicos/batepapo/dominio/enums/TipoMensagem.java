@@ -12,41 +12,49 @@ public enum TipoMensagem {
     /**
      * Mensagem de texto normal do usuário
      */
+    @Schema(description = "Mensagem de texto normal do usuário")
     TEXTO("Texto"),
     
     /**
      * Mensagem do sistema (notificações automáticas)
      */
+    @Schema(description = "Mensagem do sistema (notificações automáticas)")
     SISTEMA("Sistema"),
     
     /**
      * Mensagem de entrada de usuário na sala
      */
+    @Schema(description = "Mensagem de entrada de usuário na sala")
     ENTRADA("Entrada"),
     
     /**
      * Mensagem de saída de usuário da sala
      */
+    @Schema(description = "Mensagem de saída de usuário da sala")
     SAIDA("Saída"),
     
     /**
      * Mensagem de moderação (avisos, banimentos, etc.)
      */
+    @Schema(description = "Mensagem de moderação (avisos, banimentos, etc.)")
     MODERACAO("Moderação"),
     
     /**
      * Mensagem com resultado de loteria
      */
+    @Schema(description = "Mensagem com resultado de loteria")
     RESULTADO("Resultado"),
     
     /**
      * Mensagem com dica ou sugestão
      */
+    @Schema(description = "Mensagem com dica ou sugestão")
     DICA("Dica"),
     
     /**
      * Mensagem de comando administrativo
      */
+    @Schema(description = "Mensagem de comando administrativo")
     COMANDO("Comando");
 
     private final String descricao;

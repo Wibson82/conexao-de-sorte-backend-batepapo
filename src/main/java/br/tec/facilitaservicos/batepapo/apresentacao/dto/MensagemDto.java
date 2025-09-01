@@ -13,62 +13,99 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * DTO reativo para Mensagem de Chat
+ * DTO reativo para Mensagem de Chat.
  * 
- * @param id Identificador único da mensagem
- * @param conteudo Conteúdo da mensagem
- * @param usuarioId ID do usuário que enviou
- * @param usuarioNome Nome do usuário que enviou
- * @param sala Nome da sala
- * @param tipo Tipo da mensagem
- * @param status Status da mensagem
- * @param respostaParaId ID da mensagem sendo respondida (opcional)
- * @param editada Se a mensagem foi editada
- * @param dataEnvio Data e hora do envio
- * @param dataEdicao Data e hora da edição (opcional)
- * @param dataCriacao Data de criação do registro
+ * Representa uma mensagem enviada em uma sala de bate-papo, incluindo
+ * todas as informações necessárias para exibição, processamento e
+ * rastreamento de mensagens em tempo real.
+ * 
+ * Principais casos de uso:
+ * - Envio e recebimento de mensagens via WebSocket
+ * - Exibição de histórico de conversas
+ * - Gerenciamento de respostas e threads
+ * - Notificações em tempo real
+ * 
+ * Funcionalidades suportadas:
+ * - Mensagens de texto, sistema e especiais
+ * - Sistema de respostas e citações
+ * - Edição de mensagens enviadas
+ * - Tracking de status de entrega
+ * - Timestamps para auditoria
+ * 
+ * Restrições de negócio:
+ * - Conteúdo limitado a 500 caracteres para performance
+ * - Apenas o autor pode editar mensagens
+ * - Mensagens do sistema têm usuarioId = -1
+ * - Status controlado automaticamente pelo sistema
+ * 
+ * Relacionamentos:
+ * - Conecta com microserviço de usuários para validação
+ * - Integra com sistema de notificações para alerts
+ * - Vincula com salas para controle de acesso
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Schema(description = "Data Transfer Object for Chat Message")
+@Schema(description = "Mensagem de bate-papo com informações completas para comunicação em tempo real")
 public record MensagemDto(
-    @Schema(description = "Unique identifier of the message", example = "1")
+    @Schema(description = "Identificador único da mensagem", 
+            example = "15847")
     Long id,
     
-    @Schema(description = "Content of the message", required = true, example = "Hello, world!")
+    @Schema(description = "Conteúdo textual da mensagem", 
+            example = "Olá pessoal! Como estão hoje?",
+            required = true,
+            maxLength = 500)
     @NotBlank(message = "Conteúdo da mensagem é obrigatório")
     @Size(max = 500, message = "Mensagem não pode exceder 500 caracteres")
     String conteudo,
     
-    @Schema(description = "Identifier of the user who sent the message", required = true, example = "123")
+    @Schema(description = "Identificador do usuário que enviou a mensagem", 
+            example = "12345",
+            required = true)
     @NotNull(message = "ID do usuário é obrigatório")
     Long usuarioId,
     
-    @Schema(description = "Name of the user who sent the message", required = true, example = "John Doe")
+    @Schema(description = "Nome de exibição do usuário remetente", 
+            example = "João Silva",
+            required = true)
     @NotBlank(message = "Nome do usuário é obrigatório")
     String usuarioNome,
     
-    @Schema(description = "Name of the room where the message was sent", required = true, example = "general")
+    @Schema(description = "Identificador da sala onde a mensagem foi enviada", 
+            example = "sala-geral",
+            required = true)
     @NotBlank(message = "Sala é obrigatória")
     String sala,
     
-    @Schema(description = "Type of the message", example = "TEXTO")
+    @Schema(description = "Tipo da mensagem", 
+            example = "TEXTO",
+            allowableValues = {"TEXTO", "SISTEMA", "IMAGEM", "ARQUIVO", "ENTRADA", "SAIDA"})
     TipoMensagem tipo,
-    @Schema(description = "Status of the message", example = "ENVIADA")
+    
+    @Schema(description = "Status atual da mensagem", 
+            example = "ENVIADA",
+            allowableValues = {"ENVIADA", "ENTREGUE", "LIDA", "FALHOU", "PENDENTE"})
     StatusMensagem status,
-    @Schema(description = "Identifier of the message being replied to", example = "456")
+    
+    @Schema(description = "ID da mensagem que está sendo respondida (para threads)", 
+            example = "15832")
     Long respostaParaId,
-    @Schema(description = "Indicates if the message has been edited", example = "false")
+    
+    @Schema(description = "Indica se a mensagem foi editada após o envio", 
+            example = "false")
     Boolean editada,
     
-    @Schema(description = "Date and time when the message was sent", example = "2025-01-01T12:00:00")
+    @Schema(description = "Data e hora de envio da mensagem", 
+            example = "2025-09-01T14:30:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime dataEnvio,
     
-    @Schema(description = "Date and time when the message was edited", example = "2025-01-01T12:01:00")
+    @Schema(description = "Data e hora da última edição (se aplicável)", 
+            example = "2025-09-01T14:32:15")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime dataEdicao,
     
-    @Schema(description = "Date and time when the message record was created", example = "2025-01-01T12:00:00")
+    @Schema(description = "Data e hora de criação do registro no banco", 
+            example = "2025-09-01T14:30:00")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime dataCriacao
 ) {
