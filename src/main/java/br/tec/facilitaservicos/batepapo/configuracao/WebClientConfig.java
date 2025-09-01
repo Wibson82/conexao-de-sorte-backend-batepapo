@@ -1,5 +1,6 @@
 package br.tec.facilitaservicos.batepapo.configuracao;
 
+import br.tec.facilitaservicos.batepapo.infraestrutura.tracing.TracingWebClientInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -13,13 +14,19 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Configuração do WebClient para comunicação entre microserviços
+ * Configuração consolidada do WebClient para comunicação entre microserviços
  */
 @Configuration
 public class WebClientConfig {
 
+    private final TracingWebClientInterceptor tracingInterceptor;
+
+    public WebClientConfig(TracingWebClientInterceptor tracingInterceptor) {
+        this.tracingInterceptor = tracingInterceptor;
+    }
+
     /**
-     * WebClient configurado para integração com outros microserviços
+     * WebClient Builder configurado para integração com outros microserviços
      */
     @Bean
     public WebClient.Builder webClientBuilder() {
@@ -33,9 +40,18 @@ public class WebClientConfig {
 
         return WebClient.builder()
             .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .filter(tracingInterceptor.fullTracingFilter())
             .codecs(configurer -> configurer
                 .defaultCodecs()
                 .maxInMemorySize(1024 * 1024) // 1MB
             );
+    }
+
+    /**
+     * WebClient pré-configurado com tracing
+     */
+    @Bean
+    public WebClient webClient() {
+        return webClientBuilder().build();
     }
 }

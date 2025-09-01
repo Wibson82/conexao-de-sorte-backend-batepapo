@@ -55,10 +55,10 @@ batepapo/
 ### 🔗 **Integrações Via API**
 ```yaml
 # Verificar usuário online
-GET http://auth-microservice:8081/api/users/{id}/status
+GET http://auth-microservice:8081/rest/v1/users/{id}/status
 
 # Enviar notificação
-POST http://notifications-microservice:8084/api/notifications
+POST http://notifications-microservice:8084/rest/v1/notifications
 {
   "userId": 123,
   "type": "NEW_MESSAGE",
@@ -66,7 +66,7 @@ POST http://notifications-microservice:8084/api/notifications
 }
 
 # Registrar auditoria  
-POST http://audit-microservice:8085/api/audit/events
+POST http://audit-microservice:8085/rest/v1/audit/events
 {
   "eventType": "MESSAGE_SENT", 
   "userId": 123,
@@ -133,7 +133,7 @@ public class AuthServiceClient {
     
     public Mono<Boolean> verificarUsuarioOnline(Long usuarioId) {
         return webClient.get()
-            .uri("/api/users/{id}/online", usuarioId)
+            .uri("/rest/v1/users/{id}/online", usuarioId)
             .retrieve()
             .bodyToMono(Boolean.class)
             .onErrorReturn(false); // Fallback se auth service indisponível

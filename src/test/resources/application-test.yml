@@ -21,21 +21,12 @@
 spring:
   application:
     name: batepapo-microservice-test
-  profiles:
-    active: test
   main:
     banner-mode: off
-
-# ========================================
-# 🌐 SERVIDOR (PORTA ALEATÓRIA)
-# ========================================
-server:
-  port: 0
-
-# ========================================
-# 🗄️ BANCO DE DADOS (H2 EM MEMÓRIA)
-# ========================================
-spring:
+    
+  # ========================================
+  # 🗄️ BANCO DE DADOS (H2 EM MEMÓRIA)
+  # ========================================
   r2dbc:
     url: r2dbc:h2:mem:///testdb?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
@@ -45,10 +36,9 @@ spring:
   flyway:
     enabled: false
 
-# ========================================
-# 🔐 SEGURANÇA JWT (MOCK)
-# ========================================
-spring:
+  # ========================================
+  # 🔐 SEGURANÇA JWT (MOCK)
+  # ========================================
   security:
     oauth2:
       resourceserver:
@@ -56,16 +46,21 @@ spring:
           # JWT desabilitado para testes - usar @WithMockUser
           enabled: false
 
-# ========================================
-# 🚀 REDIS (MOCK/EMBARCADO)
-# ========================================
-spring:
+  # ========================================
+  # 🚀 REDIS (MOCK/EMBARCADO)
+  # ========================================
   data:
     redis:
       # Redis embarcado para testes
       host: localhost
       port: 6371
       timeout: 500ms
+
+# ========================================
+# 🌐 SERVIDOR (PORTA ALEATÓRIA)
+# ========================================
+server:
+  port: 0
 
 # ========================================
 # 🚦 FEATURE FLAGS (TESTES)
@@ -142,6 +137,17 @@ cors:
   allow-credentials: false
 
 # ========================================
+# 🌐 CONFIGURAÇÕES DE SERVIÇOS EXTERNOS (MOCK)
+# ========================================
+services:
+  auth:
+    url: http://localhost:8081
+    endpoints:
+      validate: /auth/validate
+      users: /rest/v1/users
+    timeout: 1s
+    
+# ========================================
 # 🧪 CONFIGURAÇÕES ESPECÍFICAS DE TESTE
 # ========================================
 test:
@@ -150,6 +156,7 @@ test:
     redis: true
     websocket: true
     sse: true
+    auth: true  # Mock do serviço de autenticação
   
   # Dados de teste
   usuarios-teste:

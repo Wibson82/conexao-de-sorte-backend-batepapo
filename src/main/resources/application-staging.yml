@@ -1,0 +1,228 @@
+# ============================================================================
+# 🏗️ CONFIGURAÇÃO STAGING - MICROSERVIÇO BATE-PAPO
+# ============================================================================
+# Perfil otimizado para ambiente de staging com observabilidade enhanced
+# Mantém padrões de produção com flexibilidade para testes
+# ============================================================================
+
+# ========================================
+# 🌐 SERVIDOR
+# ========================================
+server:
+  port: ${STAGING_SERVER_PORT:8087}
+  shutdown: graceful
+  servlet:
+    context-path: /rest/v1
+
+# ========================================
+# 🗄️ BANCO DE DADOS - R2DBC
+# ========================================
+spring:
+  application:
+    name: batepapo-staging
+    
+  r2dbc:
+    url: ${STAGING_DATABASE_R2DBC_URL:r2dbc:mysql://localhost:3307/conexao_sorte_chat}
+    username: ${STAGING_DATABASE_USERNAME:conexao_sorte}
+    password: ${STAGING_DATABASE_PASSWORD}
+    pool:
+      enabled: true
+      initial-size: 10  # Mais conexões para websockets
+      max-size: 30
+      max-idle-time: 30m
+      
+  # ========================================
+  # 🗄️ FLYWAY PARA MIGRATIONS
+  # ========================================
+  flyway:
+    enabled: true
+    url: ${STAGING_DATABASE_FLYWAY_URL:jdbc:mysql://localhost:3307/conexao_sorte_chat}
+    user: ${STAGING_DATABASE_USERNAME:conexao_sorte}
+    password: ${STAGING_DATABASE_PASSWORD}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    
+  # ========================================
+  # 🚀 REDIS
+  # ========================================
+  data:
+    redis:
+      host: ${STAGING_REDIS_HOST:localhost}
+      port: ${STAGING_REDIS_PORT:6380}
+      password: ${STAGING_REDIS_PASSWORD}
+      database: 4
+      timeout: 2000ms
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 16  # Mais conexões para pub/sub
+          max-idle: 8
+          min-idle: 2
+          
+  # ========================================
+  # 🔐 SEGURANÇA JWT
+  # ========================================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://staging.conexaodesorte.com}
+
+# ========================================
+# 📊 ACTUATOR & OBSERVABILIDADE
+# ========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,configprops
+      cors:
+        allowed-origins: "*"
+        allowed-methods: GET,POST
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+        step: 30s
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0  # 100% em staging para debug completo
+
+# ========================================
+# 📝 LOGGING ENHANCED
+# ========================================
+logging:
+  level:
+    root: INFO
+    br.tec.facilitaservicos.batepapo: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.r2dbc: INFO
+    org.springframework.data.redis: DEBUG
+    reactor.netty.http.server: INFO
+    org.springframework.web.reactive: DEBUG
+    org.springframework.messaging: DEBUG
+    org.springframework.websocket: DEBUG
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} [STAGING] %m%n%wEx"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - [STAGING] %msg%n"
+  file:
+    name: /tmp/batepapo-staging.log
+    max-size: 100MB
+    max-history: 30
+
+# ========================================
+# 🌐 CORS PERMISSIVO PARA STAGING
+# ========================================
+cors:
+  allowed-origins: 
+    - "http://localhost:3000"
+    - "https://staging.conexaodesorte.com"
+  allowed-methods: "*"
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# ========================================
+# 🛡️ RESILIENCE4J - CONFIGURAÇÃO STAGING
+# ========================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      notification-service:
+        enabled: true
+        failure-rate-threshold: 30  # Mais permissivo em staging
+        wait-duration-in-open-state: 30s
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+  
+  ratelimiter:
+    instances:
+      chat-api:
+        enabled: true
+        limit-for-period: 5000  # Alto para permitir muitas mensagens
+        limit-refresh-period: 1m
+        timeout-duration: 500ms
+
+# ========================================
+# 🔧 CONFIGURAÇÕES ESPECÍFICAS DO MICROSERVIÇO
+# ========================================
+chat:
+  features:
+    message-encryption: true
+    file-sharing: true
+    voice-messages: false  # Desabilitado em staging
+    message-reactions: true
+    typing-indicators: true
+    
+  cache:
+    message-cache-ttl: 600s   # 10 minutos
+    room-cache-ttl: 1800s     # 30 minutos
+    user-status-ttl: 300s     # 5 minutos
+    
+  api:
+    rate-limit:
+      enabled: true
+      messages-per-minute: 1000
+      
+  validation:
+    message-max-length: 5000  # Mais flexível em staging
+    file-max-size: 50MB
+    
+  websocket:
+    max-connections: 1000     # Mais permissivo em staging
+    heartbeat-interval: 30s
+    
+  moderation:
+    auto-moderation: false    # Desabilitado em staging
+    profanity-filter: false
+
+# ========================================
+# 📱 INTEGRAÇÃO COM OUTROS MICROSERVIÇOS
+# ========================================
+services:
+  notification:
+    url: http://notification-service:8088
+    timeout: 10s
+  user:
+    url: http://user-service:8089
+    timeout: 5s
+  audit:
+    url: http://audit-service:8085
+    timeout: 5s
+    
+# ========================================
+# 🧪 DEBUG & DESENVOLVIMENTO
+# ========================================
+debug: true
+
+spring:
+  jpa:
+    show-sql: false  # Mantém false para não poluir logs
+    properties:
+      hibernate:
+        format_sql: true
+        
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha

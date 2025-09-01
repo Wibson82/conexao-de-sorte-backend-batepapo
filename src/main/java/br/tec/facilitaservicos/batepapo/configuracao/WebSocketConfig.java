@@ -1,56 +1,47 @@
 package br.tec.facilitaservicos.batepapo.configuracao;
 
-import br.tec.facilitaservicos.batepapo.websocket.ChatWebSocketHandler;
-import br.tec.facilitaservicos.batepapo.websocket.PresenceWebSocketHandler;
+import br.tec.facilitaservicos.batepapo.websocket.ReactiveWebSocketHandler;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import org.springframework.web.socket.config.annotation.EnableWebSocket;
-import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
-import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
+import org.springframework.web.reactive.HandlerMapping;
+import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
+import org.springframework.web.reactive.socket.WebSocketHandler;
+import org.springframework.web.reactive.socket.server.support.WebSocketHandlerAdapter;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * WebSocket configuration for real-time chat functionality
- * Follows AGENTS.md guidelines - Java 24, Spring Boot 3.5.5, no hardcoded values
+ * Reactive WebSocket configuration for real-time chat functionality
+ * Compatible with Spring WebFlux - Java 24, Spring Boot 3.5.5
  */
 @Configuration
-@EnableWebSocket
-public class WebSocketConfig implements WebSocketConfigurer {
+public class WebSocketConfig {
     
-    private final ChatWebSocketHandler chatHandler;
-    private final PresenceWebSocketHandler presenceHandler;
+    private final ReactiveWebSocketHandler webSocketHandler;
     private final Environment environment;
     
-    public WebSocketConfig(ChatWebSocketHandler chatHandler, 
-                          PresenceWebSocketHandler presenceHandler,
+    public WebSocketConfig(ReactiveWebSocketHandler webSocketHandler,
                           Environment environment) {
-        this.chatHandler = chatHandler;
-        this.presenceHandler = presenceHandler;
+        this.webSocketHandler = webSocketHandler;
         this.environment = environment;
     }
     
-    @Override
-    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        String[] allowedOrigins = getAllowedOrigins();
+    @Bean
+    public HandlerMapping webSocketMapping() {
+        Map<String, WebSocketHandler> map = new HashMap<>();
+        map.put("/ws/chat", webSocketHandler);
+        map.put("/ws/presence", webSocketHandler);
         
-        // Chat WebSocket endpoint
-        registry.addHandler(chatHandler, "/ws/chat")
-            .setAllowedOrigins(allowedOrigins)
-            .withSockJS()
-            .setHeartbeatTime(25000)
-            .setDisconnectDelay(5000)
-            .setStreamBytesLimit(128 * 1024) // 128KB
-            .setHttpMessageCacheSize(1000);
-            
-        // Presence WebSocket endpoint  
-        registry.addHandler(presenceHandler, "/ws/presence")
-            .setAllowedOrigins(allowedOrigins)
-            .withSockJS()
-            .setHeartbeatTime(30000)
-            .setDisconnectDelay(3000);
+        SimpleUrlHandlerMapping mapping = new SimpleUrlHandlerMapping();
+        mapping.setUrlMap(map);
+        mapping.setOrder(-1); // Before annotated controllers
+        return mapping;
     }
     
-    private String[] getAllowedOrigins() {
-        String corsOrigins = environment.getProperty("CORS_ALLOWED_ORIGINS", "http://localhost:3000");
-        return corsOrigins.split(",");
+    @Bean
+    public WebSocketHandlerAdapter handlerAdapter() {
+        return new WebSocketHandlerAdapter();
     }
 }

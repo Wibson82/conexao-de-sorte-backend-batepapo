@@ -79,7 +79,7 @@ mvn spring-boot:run
 
 ### 2. Acesse os Serviços
 
-- **API**: http://localhost:8083/api/chat
+- **API**: http://localhost:8083/rest/v1/chat
 - **Swagger UI**: http://localhost:8083/swagger-ui.html
 - **Actuator**: http://localhost:8083/actuator
 - **Grafana**: http://localhost:3002 (admin:admin123!)
@@ -91,36 +91,36 @@ mvn spring-boot:run
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| `POST` | `/api/chat/mensagem` | Enviar mensagem |
-| `GET` | `/api/chat/mensagens/{sala}` | Histórico paginado |
-| `PUT` | `/api/chat/mensagem/{id}` | Editar mensagem |
-| `DELETE` | `/api/chat/mensagem/{id}` | Excluir mensagem |
+| `POST` | `/rest/v1/chat/mensagem` | Enviar mensagem |
+| `GET` | `/rest/v1/chat/mensagens/{sala}` | Histórico paginado |
+| `PUT` | `/rest/v1/chat/mensagem/{id}` | Editar mensagem |
+| `DELETE` | `/rest/v1/chat/mensagem/{id}` | Excluir mensagem |
 
 ### Streaming em Tempo Real
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| `GET` | `/api/chat/stream/{sala}` | SSE stream de mensagens |
-| `GET` | `/api/chat/stream/{sala}/eventos` | SSE stream completo |
-| `GET` | `/api/chat/stream/presenca` | Stream global de presença |
+| `GET` | `/rest/v1/chat/stream/{sala}` | SSE stream de mensagens |
+| `GET` | `/rest/v1/chat/stream/{sala}/eventos` | SSE stream completo |
+| `GET` | `/rest/v1/chat/stream/presenca` | Stream global de presença |
 
 ### Salas e Usuários
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| `GET` | `/api/chat/salas` | Listar salas disponíveis |
-| `POST` | `/api/chat/salas` | Criar nova sala |
-| `GET` | `/api/chat/online/{sala}` | Usuários online |
-| `POST` | `/api/chat/entrar/{sala}` | Entrar em sala |
-| `DELETE` | `/api/chat/sair/{sala}` | Sair de sala |
-| `PUT` | `/api/chat/heartbeat` | Atualizar heartbeat |
+| `GET` | `/rest/v1/chat/salas` | Listar salas disponíveis |
+| `POST` | `/rest/v1/chat/salas` | Criar nova sala |
+| `GET` | `/rest/v1/chat/online/{sala}` | Usuários online |
+| `POST` | `/rest/v1/chat/entrar/{sala}` | Entrar em sala |
+| `DELETE` | `/rest/v1/chat/sair/{sala}` | Sair de sala |
+| `PUT` | `/rest/v1/chat/heartbeat` | Atualizar heartbeat |
 
 ## 🎮 Exemplos de Uso
 
 ### Enviar Mensagem
 
 ```bash
-curl -X POST "http://localhost:8083/api/chat/mensagem" \
+curl -X POST "http://localhost:8083/rest/v1/chat/mensagem" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -133,7 +133,7 @@ curl -X POST "http://localhost:8083/api/chat/mensagem" \
 
 ```javascript
 const eventSource = new EventSource(
-  'http://localhost:8083/api/chat/stream/geral',
+  'http://localhost:8083/rest/v1/chat/stream/geral',
   {
     headers: {
       'Authorization': 'Bearer YOUR_JWT_TOKEN'
@@ -265,7 +265,7 @@ redis:
     
 rate-limit:
   endpoints:
-    "/api/chat/mensagem":
+    "/rest/v1/chat/mensagem":
       requests-per-minute: 10
 ```
 
@@ -345,3 +345,13 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para de
 ---
 
 **💬 Microserviço Bate-papo** - Sistema de Migração R2DBC v1.0
+## ✅ Qualidade e Segurança (CI)
+
+- Cobertura: JaCoCo ≥ 80% (gate no workflow Maven Verify).
+- SAST: CodeQL ativo.
+
+## 🧪 Staging: Integrações, Robustez e Cache
+
+- Integrações: Autenticação (JWT via JWKS), Redis Streams/Sessions — validar fluxo.
+- Resilience4j: validar CB/Retry para operações externas.
+- Cache: validar TTLs e comportamento sob carga (WebSocket e REST).

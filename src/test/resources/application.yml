@@ -1,0 +1,16 @@
+spring:
+  r2dbc:
+    url: r2dbc:h2:mem:///testdb;DB_CLOSE_DELAY=-1;
+    username: sa
+    password: 
+  flyway:
+    enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:9999/auth/realms/test/protocol/openid-connect/certs
+
+logging:
+  level:
+    br.tec.facilitaservicos.batepapo: DEBUG

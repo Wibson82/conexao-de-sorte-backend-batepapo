@@ -28,7 +28,7 @@ public class SecurityConfigSimples {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/api/v1/chat/health").permitAll()
+                .pathMatchers("/rest/v1/chat/health").permitAll()
                 .pathMatchers("/actuator/health").permitAll()
                 .anyExchange().permitAll() // MVP: permitir tudo por enquanto
             )

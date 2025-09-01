@@ -117,7 +117,7 @@ curl -f http://localhost:8083/actuator/health/db
 
 ```bash
 # Verificar endpoint de saúde do WebSocket
-curl -f http://localhost:8083/api/v1/chat/health
+curl -f http://localhost:8083/rest/v1/chat/health
 # Deve retornar status das funcionalidades de chat
 
 # Verificar conectividade com Redis
@@ -125,7 +125,7 @@ curl -f http://localhost:8083/actuator/health/redis
 # Deve retornar: {"status":"UP"}
 
 # Testar endpoint de WebSocket info (sem se conectar)
-curl -s http://localhost:8083/api/v1/chat/info | jq .
+curl -s http://localhost:8083/rest/v1/chat/info | jq .
 # Deve retornar informações sobre capacidade, usuários online, etc.
 
 # Verificar métricas de WebSocket (se habilitadas)
@@ -153,11 +153,11 @@ redis-cli -h <redis-host> -p <redis-port> -a <redis-password> ttl "chat:session:
 ```bash
 # Testar conexão WebSocket com wscat (instalar se necessário)
 # npm install -g wscat
-wscat -c ws://localhost:8083/api/v1/chat/websocket
+wscat -c ws://localhost:8083/rest/v1/chat/websocket
 # Deve conectar sem erros
 
 # Testar autenticação WebSocket com JWT
-wscat -c "ws://localhost:8083/api/v1/chat/websocket" \
+wscat -c "ws://localhost:8083/rest/v1/chat/websocket" \
   -H "Authorization: Bearer <valid-jwt-token>"
 # Deve conectar e permitir envio de mensagens
 ```
@@ -167,11 +167,11 @@ wscat -c "ws://localhost:8083/api/v1/chat/websocket" \
 ```bash
 # Testar endpoint protegido com JWT válido
 curl -H "Authorization: Bearer <test-jwt-token>" \
-  http://localhost:8083/api/v1/chat/rooms
+  http://localhost:8083/rest/v1/chat/rooms
 # Deve retornar lista de salas disponíveis ou erro 401 sem token
 
 # Testar criação de sala de chat
-curl -X POST http://localhost:8083/api/v1/chat/rooms \
+curl -X POST http://localhost:8083/rest/v1/chat/rooms \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <valid-jwt-token>" \
   -d '{"name":"Teste","description":"Sala de teste","type":"PUBLIC"}'
@@ -275,7 +275,7 @@ else
 fi
 
 # Testar endpoint de info do chat
-if curl -f -s http://localhost:8083/api/v1/chat/info > /dev/null; then
+if curl -f -s http://localhost:8083/rest/v1/chat/info > /dev/null; then
     echo "✅ Endpoint de info do chat funcionando"
 else
     echo "⚠️ Endpoint de info do chat não disponível (pode ser normal se não implementado)"
@@ -332,7 +332,7 @@ chmod +x /usr/local/bin/check-key-expiration-batepapo.sh
 
 ```bash
 # Testar criação de sala de chat (requer autenticação)
-curl -X POST http://localhost:8083/api/v1/chat/rooms \
+curl -X POST http://localhost:8083/rest/v1/chat/rooms \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <valid-jwt-token>" \
   -d '{
@@ -344,10 +344,10 @@ curl -X POST http://localhost:8083/api/v1/chat/rooms \
 
 # Testar listagem de salas
 curl -H "Authorization: Bearer <valid-jwt-token>" \
-  http://localhost:8083/api/v1/chat/rooms
+  http://localhost:8083/rest/v1/chat/rooms
 
 # Testar envio de mensagem
-curl -X POST http://localhost:8083/api/v1/chat/messages \
+curl -X POST http://localhost:8083/rest/v1/chat/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <valid-jwt-token>" \
   -d '{
@@ -358,7 +358,7 @@ curl -X POST http://localhost:8083/api/v1/chat/messages \
 
 # Verificar histórico de mensagens
 curl -H "Authorization: Bearer <valid-jwt-token>" \
-  "http://localhost:8083/api/v1/chat/messages?roomId=test-room-id&limit=10"
+  "http://localhost:8083/rest/v1/chat/messages?roomId=test-room-id&limit=10"
 
 # Verificar métricas de chat
 curl -s http://localhost:8083/actuator/metrics/chat.active.connections
@@ -371,7 +371,7 @@ curl -s http://localhost:8083/actuator/metrics/chat.errors.total
 ```bash
 # Testar rate limiting (deve bloquear após muitas tentativas)
 for i in {1..20}; do
-  curl -X POST http://localhost:8083/api/v1/chat/messages \
+  curl -X POST http://localhost:8083/rest/v1/chat/messages \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer <valid-jwt-token>" \
     -d '{"roomId":"test","content":"spam test '$i'","type":"TEXT"}' \
@@ -379,7 +379,7 @@ for i in {1..20}; do
 done
 
 # Testar moderação de conteúdo (deve bloquear conteúdo impróprio)
-curl -X POST http://localhost:8083/api/v1/chat/messages \
+curl -X POST http://localhost:8083/rest/v1/chat/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <valid-jwt-token>" \
   -d '{

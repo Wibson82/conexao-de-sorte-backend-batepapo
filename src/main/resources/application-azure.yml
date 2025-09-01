@@ -19,23 +19,16 @@ spring:
         secret:
           enabled: false  # Usando configtree para maior segurança
 
-  # ===== DATABASE CONFIGURATION =====
-  datasource:
-    url: ${DB_URL:jdbc:mysql://conexao-mysql:3306/conexao_de_sorte?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo}
+  # ===== R2DBC (REACTIVE) DATABASE CONFIGURATION =====
+  r2dbc:
+    url: ${SPRING_R2DBC_URL:r2dbc:pool:mysql://conexao-mysql:3306/conexao_de_sorte?tls=false&zeroDate=use_null&serverZoneId=America/Sao_Paulo}
     username: ${DB_USER:chat_user}
     password: ${DB_PASSWORD:}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      maximum-pool-size: 15
-      minimum-idle: 5
-      connection-timeout: 30000
-
-  # ===== JPA CONFIGURATION =====
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    database-platform: org.hibernate.dialect.MySQL8Dialect
-    show-sql: false
+    pool:
+      enabled: true
+      initial-size: 5
+      max-size: 20
+      max-idle-time: 30s
 
 # ===== MICROSERVICE SPECIFIC CONFIG =====
 app:
@@ -189,7 +182,7 @@ security:
 server:
   port: ${SERVER_PORT:8083}
   servlet:
-    context-path: /api/v1/chat
+    context-path: /rest/v1/chat
   compression:
     enabled: true
   http2:

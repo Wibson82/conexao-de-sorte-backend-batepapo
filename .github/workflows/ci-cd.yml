@@ -222,9 +222,9 @@ jobs:
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Load Azure Key Vault secrets
         run: |
@@ -353,9 +353,9 @@ jobs:
             -e SERVER_PORT=8079 \
             -e SPRING_CONFIG_IMPORT=optional:configtree:/run/secrets/ \
             -e TZ=${{ env.TZ }} \
-            -e AZURE_CLIENT_ID="${{ vars.AZURE_CLIENT_ID }}" \
-            -e AZURE_TENANT_ID="${{ vars.AZURE_TENANT_ID }}" \
-            -e AZURE_KEYVAULT_ENDPOINT="${{ vars.AZURE_KEYVAULT_ENDPOINT }}" \
+            -e AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}" \
+            -e AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}" \
+            -e AZURE_KEYVAULT_ENDPOINT="${{ secrets.AZURE_KEYVAULT_ENDPOINT }}" \
             -e conexao_de_sorte_database_url="${DB_URL}" \
             -e conexao_de_sorte_database_username="${DB_USERNAME}" \
             -e conexao_de_sorte_database_password="${DB_PASSWORD}" \
