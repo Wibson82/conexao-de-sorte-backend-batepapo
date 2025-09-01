@@ -23,11 +23,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         
         <!-- Dependências para documentação -->
-        <springdoc.version>2.8.9</springdoc.version>
+        <springdoc.version>2.8.11</springdoc.version>
         <logstash.version>8.1</logstash.version>
         
         <!-- Testcontainers -->
-        <testcontainers.version>1.20.4</testcontainers.version>
+        <testcontainers.version>1.21.3</testcontainers.version>
     </properties>
 
     <dependencyManagement>
