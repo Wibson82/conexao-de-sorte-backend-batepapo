@@ -1,5 +1,7 @@
 package br.tec.facilitaservicos.batepapo.dominio.enums;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * Enum que representa o status de presença de um usuário no chat
  * 

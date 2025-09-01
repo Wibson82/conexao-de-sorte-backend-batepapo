@@ -44,7 +44,7 @@ public class ChatMessageDTO {
     
     @Schema(description = "Conteúdo textual da mensagem", 
             example = "Olá pessoal!",
-            required = true,
+            requiredMode = Schema.RequiredMode.REQUIRED,
             maxLength = 500)
     @NotBlank(message = "Conteúdo da mensagem é obrigatório")
     @Size(max = 500, message = "Conteúdo não pode exceder 500 caracteres")
@@ -52,7 +52,7 @@ public class ChatMessageDTO {
     
     @Schema(description = "Identificador da sala de destino", 
             example = "sala-geral",
-            required = true)
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "ID da sala é obrigatório")
     private String salaId;
     

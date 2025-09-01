@@ -9,8 +9,8 @@ import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.stream.StreamReceiver;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import jakarta.annotation.PostConstruct;
@@ -23,6 +23,7 @@ import java.util.Map;
  * Processa eventos de outros microserviços para manter consistência
  */
 @Component
+@Profile("!test")
 public class ChatEventConsumer {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatEventConsumer.class);

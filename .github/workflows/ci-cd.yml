@@ -30,7 +30,7 @@ jobs:
     name: 🏗️ Build and Test
     steps:
       - uses: actions/checkout@v4
-      - name: Guard: forbid r2dbc:h2 outside tests
+      - name: Guard - forbid r2dbc:h2 outside tests
         run: |
           set -euo pipefail
           FOUND=$(grep -R --line-number --include='*.yml' --include='*.properties' --include='*.yaml' "r2dbc:h2" src || true)
@@ -39,7 +39,7 @@ jobs:
             echo "$FOUND" | grep -v "src/test/" >&2 || true
             exit 1
           fi
-      - name: Guard: H2 not in non-test scopes
+      - name: Guard - H2 not in non-test scopes
         run: |
           set -euo pipefail
           mvn -B -q dependency:list -DincludeScope=compile -DoutputFile=dep.txt -DappendOutput=true || true
@@ -58,394 +58,230 @@ jobs:
         run: |
           chmod +x ./mvnw
           ./mvnw --version
-      - name: Run unit tests
-        run: ./mvnw clean test -Dspring.profiles.active=test
+      - name: Run tests with coverage verification
+        run: ./mvnw clean verify -Dspring.profiles.active=test
       - name: Build application
         run: ./mvnw clean package -DskipTests -Dspring.profiles.active=production
-      - name: Upload artifact
+      - name: Upload JaCoCo Coverage Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-reports
+          path: |
+            target/site/jacoco/
+            target/site/jacoco/jacoco.xml
+            target/site/jacoco/jacoco.csv
+          retention-days: 30
+      - name: Upload application artifact
         uses: actions/upload-artifact@v4
         with:
           name: batepapo-microservice-jar
           path: target/*.jar
           retention-days: 7
 
+  security-scan:
+    runs-on: ubuntu-latest
+    name: 🛡️ Security Analysis (Snyk SAST)
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java 24
+        uses: actions/setup-java@v4
+        with:
+          java-version: '24'
+          distribution: 'temurin'
+          cache: maven
+      - name: Verify Maven wrapper
+        run: |
+          chmod +x ./mvnw
+          ./mvnw --version
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/maven@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --all-projects --severity-threshold=high --fail-on=all --project-name=batepapo-service
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+      - name: Monitor with Snyk (main branch only)
+        if: github.ref == 'refs/heads/main'
+        uses: snyk/actions/maven@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: monitor
+          args: --project-name=batepapo-service
+
   build-image:
     runs-on: ubuntu-latest
     name: 🐳 Build Docker Image
-    needs: build-and-test
-    permissions:
-      id-token: write
-      contents: read
-      packages: write
-      attestations: write
-    outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
-      image-name-lower: ${{ steps.image_name.outputs.image_name_lower }}
-      image-tags: ${{ steps.meta.outputs.tags }}
+    needs: [build-and-test, security-scan]
+    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute lowercase image name
-        id: image_name
-        run: |
-          set -euo pipefail
-          REPO='${{ env.IMAGE_NAME }}'
-          echo "image_name_lower=$(echo "$REPO" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-
+      - name: Download application artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: batepapo-microservice-jar
+          path: target/
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
-
-      - name: Login to GHCR
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.image_name.outputs.image_name_lower }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=ref,event=branch
             type=ref,event=pr
+            type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value={{date 'YYYY-MM-DD-HHmmss'}}-{{sha}},enable={{is_default_branch}}
-          labels: |
-            org.opencontainers.image.title=Batepapo Microservice
-            org.opencontainers.image.description=Chat and real-time communication microservice
-            org.opencontainers.image.service=${{ env.SERVICE_NAME }}
-
-      - name: Build and push image
-        id: build
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          sbom: true
-          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          network: host
-          build-args: |
-            SERVICE_NAME=${{ env.SERVICE_NAME }}
-            BUILD_DATE=${{ github.event.head_commit.timestamp || github.run_id }}
-            VCS_REF=${{ github.sha }}
-            VERSION=1.0.0
+          platforms: linux/amd64,linux/arm64
 
   sign-image:
     runs-on: ubuntu-latest
-    name: ✍️ Sign & Verify (100% OIDC keyless)
+    name: 🔐 Sign Container Image
     needs: build-image
+    if: github.event_name != 'pull_request'
     permissions:
-      id-token: write
       contents: read
-      packages: write
-      attestations: write
+      id-token: write
     steps:
-      - name: Verify OIDC token availability
-        run: |
-          echo "🔍 Verifying OIDC token is available..."
-          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
-            echo "❌ OIDC token not available"
-            exit 1
-          fi
-          echo "✅ OIDC token is available"
-          
-      - name: Resolve image digest ref
-        id: ref
-        run: |
-          set -euo pipefail
-          IMG="ghcr.io/${{ needs.build-image.outputs.image-name-lower }}@${{ needs.build-image.outputs.image-digest }}"
-          echo "lower=$(echo "$IMG" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
         with:
-          cosign-release: v2.5.3
-
-      - name: Login GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull digest
-        run: docker pull "${{ steps.ref.outputs.lower }}"
-
-      - name: Sign (keyless OIDC)
-        env:
-          COSIGN_EXPERIMENTAL: "1"
-        run: |
-          echo "🔐 Signing container image with OIDC keyless signature..."
-          cosign sign --yes "${{ steps.ref.outputs.lower }}"
-
-      - name: Verify OIDC signature
-        env:
-          COSIGN_EXPERIMENTAL: "1"
-        run: |
-          echo "✅ Verifying OIDC keyless signature..."
-          cosign verify \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/\.github/workflows/.*@refs/heads/main$" \
-            "${{ steps.ref.outputs.lower }}"
-          echo "🎉 Container image signature verified successfully!"
-          
-      - name: Generate SBOM attestation (OIDC)
-        env:
-          COSIGN_EXPERIMENTAL: "1"  
-        run: |
-          echo "📋 Generating SBOM attestation with OIDC..."
-          cosign attest --yes --type=spdxjson \
-            --predicate=/dev/null \
-            "${{ steps.ref.outputs.lower }}" || echo "SBOM attestation optional - continuing"
-
-
-  deploy-production:
-    needs: [build-image, sign-image]
-    runs-on: [self-hosted, linux, x64, production, batepapo-service]
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
-    name: 🌟 Deploy to Production (self-hosted, OIDC)
-    permissions:
-      id-token: write
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Load Azure Key Vault secrets
-        run: |
-          set -euo pipefail
-          # Extract vault name from AZURE_KEYVAULT_ENDPOINT
-          VAULT_ENDPOINT="${{ vars.AZURE_KEYVAULT_ENDPOINT }}"
-          if [[ "$VAULT_ENDPOINT" =~ https://([^.]+)\.vault\.azure\.net ]]; then
-            VAULT="${BASH_REMATCH[1]}"
-          else
-            echo "ERROR: Invalid AZURE_KEYVAULT_ENDPOINT format: $VAULT_ENDPOINT" >&2
-            echo "Expected format: https://vault-name.vault.azure.net/" >&2
-            exit 1
-          fi
-          
-          echo "Loading secrets from Azure Key Vault: $VAULT (endpoint: $VAULT_ENDPOINT)" >&2
-          echo "VAULT=$VAULT" >> "$GITHUB_ENV"
-
-          get() { 
-            echo "Fetching secret: $1" >&2
-            SECRET_VALUE=$(az keyvault secret show --vault-name "$VAULT" --name "$1" --query value -o tsv 2>/dev/null)
-            if [ $? -ne 0 ] || [ -z "$SECRET_VALUE" ]; then
-              echo "ERROR: Secret $1 not found in Azure Key Vault $VAULT" >&2
-              echo "Available secrets in vault:" >&2
-              az keyvault secret list --vault-name "$VAULT" --query '[].name' -o tsv >&2
-              exit 1
-            fi
-            echo "$SECRET_VALUE"
-          }
-
-          # Database secrets
-          echo "DB_URL=$(get conexao-de-sorte-database-url)" >> $GITHUB_ENV
-          echo "DB_USERNAME=$(get conexao-de-sorte-database-username)" >> $GITHUB_ENV
-          echo "DB_PASSWORD=$(get conexao-de-sorte-database-password)" >> $GITHUB_ENV
-          echo "DB_JDBC_URL=$(get conexao-de-sorte-database-jdbc-url)" >> $GITHUB_ENV
-          
-          # Redis secrets
-          echo "REDIS_HOST=$(get conexao-de-sorte-redis-host)" >> $GITHUB_ENV
-          echo "REDIS_PORT=$(get conexao-de-sorte-redis-port)" >> $GITHUB_ENV
-          echo "REDIS_PASSWORD=$(get conexao-de-sorte-redis-password)" >> $GITHUB_ENV
-          echo "REDIS_DATABASE=$(get conexao-de-sorte-redis-database)" >> $GITHUB_ENV
-          
-          # JWT secrets
-          echo "JWT_SECRET=$(get conexao-de-sorte-jwt-secret)" >> $GITHUB_ENV
-          echo "JWT_KEY_ID=$(get conexao-de-sorte-jwt-key-id)" >> $GITHUB_ENV
-          echo "JWT_SIGNING_KEY=$(get conexao-de-sorte-jwt-signing-key)" >> $GITHUB_ENV
-          echo "JWT_VERIFICATION_KEY=$(get conexao-de-sorte-jwt-verification-key)" >> $GITHUB_ENV
-          echo "JWT_ISSUER=$(get conexao-de-sorte-jwt-issuer)" >> $GITHUB_ENV
-          echo "JWT_JWKS_URI=$(get conexao-de-sorte-jwt-jwks-uri)" >> $GITHUB_ENV
-          
-          # Encryption secrets
-          echo "ENCRYPTION_MASTER_KEY=$(get conexao-de-sorte-encryption-master-key)" >> $GITHUB_ENV
-          echo "ENCRYPTION_MASTER_PASSWORD=$(get conexao-de-sorte-encryption-master-password)" >> $GITHUB_ENV
-          echo "ENCRYPTION_BACKUP_KEY=$(get conexao-de-sorte-encryption-backup-key)" >> $GITHUB_ENV
-          
-          # SSL/TLS secrets
-          echo "SSL_ENABLED=$(get conexao-de-sorte-ssl-enabled)" >> $GITHUB_ENV
-          echo "SSL_KEYSTORE_PATH=$(get conexao-de-sorte-ssl-keystore-path)" >> $GITHUB_ENV
-          echo "SSL_KEYSTORE_PASSWORD=$(get conexao-de-sorte-ssl-keystore-password)" >> $GITHUB_ENV
-          
-          # CORS configuration
-          echo "CORS_ALLOWED_ORIGINS=$(get conexao-de-sorte-cors-allowed-origins)" >> $GITHUB_ENV
-          echo "CORS_ALLOW_CREDENTIALS=$(get conexao-de-sorte-cors-allow-credentials)" >> $GITHUB_ENV
-
-          # Create secure secrets directory
-          SECRETS_DIR=$(mktemp -d -p /tmp conexao_secrets_XXXX)
-          umask 077
-          printf '%s' "$(get conexao-de-sorte-jwt-privatekey)" > "$SECRETS_DIR/jwt_private.pem"
-          printf '%s' "$(get conexao-de-sorte-jwt-publickey)" > "$SECRETS_DIR/jwt_public.pem"
-          printf '%s' "$(get conexao-de-sorte-encryption-master-key)" > "$SECRETS_DIR/encryption_master_key"
-          printf '%s' "$(get conexao-de-sorte-encryption-master-password)" > "$SECRETS_DIR/encryption_master_password"
-          printf '%s' "$(get conexao-de-sorte-encryption-backup-key)" > "$SECRETS_DIR/encryption_backup_key"
-          chmod 600 "$SECRETS_DIR"/*
-          echo "SECRETS_DIR=$SECRETS_DIR" >> $GITHUB_ENV
-          echo "Success: Azure Key Vault secrets loaded successfully" >&2
-
-      - name: Login GHCR
+          cosign-release: 'v2.2.4'
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Garantir rede Docker
-        run: docker network inspect conexao-network >/dev/null 2>&1 || docker network create conexao-network
-
-      - name: Pull & Run (production)
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Sign container image with OIDC keyless signature
         run: |
-          set -euo pipefail
-          IMAGE="ghcr.io/${{ needs.build-image.outputs.image-name-lower }}@${{ needs.build-image.outputs.image-digest }}"
-          
-          echo "🚀 Deploying image: $IMAGE"
-          
-          # Create backup of current running container if exists
-          if docker ps -q -f name=batepapo-microservice | grep -q .; then
-            echo "📦 Creating backup of current container..."
-            docker tag batepapo-microservice batepapo-microservice:backup-$(date +%Y%m%d-%H%M%S) || true
-          fi
-          
-          # Pull new image
-          echo "📥 Pulling new image..."
-          docker pull "$IMAGE"
-          
-          # Stop and remove current container
-          echo "🛑 Stopping current container..."
-          docker stop batepapo-microservice || true
-          docker rm batepapo-microservice || true
+          echo "${{ steps.meta.outputs.tags }}" | xargs -I {} cosign sign --yes {}@${{ steps.meta.outputs.digest }}
 
-          # Create logs directory (use home directory to avoid permission issues)
-          echo "📁 Creating logs directory..."
-          mkdir -p $HOME/conexao-logs/batepapo
-          
-          # Run new container
-          echo "▶️ Starting new container..."
+  deploy-production:
+    runs-on: [self-hosted, linux, production, batepapo-service]
+    name: 🚀 Deploy to Production
+    needs: [build-image, sign-image]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment:
+      name: production
+      url: https://api.conexaodesorte.com.br/batepapo/health
+    steps:
+      - name: Retrieve secrets from Azure Key Vault
+        uses: Azure/get-keyvault-secrets@v1
+        with:
+          keyvault: "kv-conexao-de-sorte-prod"
+          secrets: |
+            database-url
+            database-username
+            database-password
+            redis-url
+            redis-password
+            jwt-secret
+            oauth2-client-id
+            oauth2-client-secret
+        id: secrets
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create or update Docker network
+        run: |
+          docker network create conexao-network 2>/dev/null || echo "Network already exists"
+      - name: Stop and remove existing container
+        run: |
+          docker stop batepapo-service 2>/dev/null || echo "Container not running"
+          docker rm batepapo-service 2>/dev/null || echo "Container not found"
+      - name: Pull and run new container
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           docker run -d \
-            --name batepapo-microservice \
+            --name batepapo-service \
             --network conexao-network \
             --restart unless-stopped \
-            -p 8079:8079 \
-            --health-cmd="curl -f http://localhost:8079/actuator/health || exit 1" \
-            --health-interval=30s --health-timeout=10s --health-retries=3 --health-start-period=60s \
-            -v "${SECRETS_DIR}":/run/secrets:ro \
-            -v $HOME/conexao-logs/batepapo:/app/logs \
-            -e JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Xmx1024m -Djava.security.egd=file:/dev/./urandom -Djava.awt.headless=true -Dfile.encoding=UTF-8" \
-            -e SPRING_PROFILES_ACTIVE=prod,azure \
-            -e ENVIRONMENT=production \
-            -e SERVER_PORT=8079 \
-            -e SPRING_CONFIG_IMPORT=optional:configtree:/run/secrets/ \
-            -e TZ=${{ env.TZ }} \
-            -e AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}" \
-            -e AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}" \
-            -e AZURE_KEYVAULT_ENDPOINT="${{ secrets.AZURE_KEYVAULT_ENDPOINT }}" \
-            -e conexao_de_sorte_database_url="${DB_URL}" \
-            -e conexao_de_sorte_database_username="${DB_USERNAME}" \
-            -e conexao_de_sorte_database_password="${DB_PASSWORD}" \
-            -e conexao_de_sorte_database_jdbc_url="${DB_JDBC_URL}" \
-            -e conexao_de_sorte_redis_host="${REDIS_HOST}" \
-            -e conexao_de_sorte_redis_port="${REDIS_PORT}" \
-            -e conexao_de_sorte_redis_password="${REDIS_PASSWORD}" \
-            -e conexao_de_sorte_redis_database="${REDIS_DATABASE}" \
-            -e conexao_de_sorte_jwt_secret="${JWT_SECRET}" \
-            -e conexao_de_sorte_jwt_key_id="${JWT_KEY_ID}" \
-            -e conexao_de_sorte_jwt_signing_key="${JWT_SIGNING_KEY}" \
-            -e conexao_de_sorte_jwt_verification_key="${JWT_VERIFICATION_KEY}" \
-            -e conexao_de_sorte_jwt_issuer="${JWT_ISSUER}" \
-            -e conexao_de_sorte_jwt_jwks_uri="${JWT_JWKS_URI}" \
-            -e conexao_de_sorte_jwt_publickey="/run/secrets/jwt_public.pem" \
-            -e conexao_de_sorte_jwt_privatekey="/run/secrets/jwt_private.pem" \
-            -e conexao_de_sorte_encryption_master_key="/run/secrets/encryption_master_key" \
-            -e conexao_de_sorte_encryption_master_password="/run/secrets/encryption_master_password" \
-            -e conexao_de_sorte_encryption_backup_key="/run/secrets/encryption_backup_key" \
-            -e conexao_de_sorte_ssl_enabled="${SSL_ENABLED}" \
-            -e conexao_de_sorte_ssl_keystore_path="${SSL_KEYSTORE_PATH}" \
-            -e conexao_de_sorte_ssl_keystore_password="${SSL_KEYSTORE_PASSWORD}" \
-            -e conexao_de_sorte_cors_allowed_origins="${CORS_ALLOWED_ORIGINS}" \
-            -e conexao_de_sorte_cors_allow_credentials="${CORS_ALLOW_CREDENTIALS}" \
-            --label "traefik.enable=true" \
-            --label "traefik.docker.network=conexao-network" \
-            --label "traefik.http.routers.batepapo.rule=Host(\`batepapo.conexaodesorte.com.br\`)" \
-            --label "traefik.http.routers.batepapo.entrypoints=websecure" \
-            --label "traefik.http.routers.batepapo.tls.certresolver=letsencrypt" \
-            --label "traefik.http.services.batepapo.loadbalancer.server.port=8079" \
-            "$IMAGE"
-
-          # Wait for container to be ready
-          echo "⏳ Waiting for container to be ready..."
-          sleep 30
-          
-          # Health check via localhost (internal)
-          echo "🔍 Performing health check..."
-          for i in $(seq 1 10); do
-            echo "⏳ Health check attempt $i/10..."
-            if curl -fsS http://localhost:8079/actuator/health >/dev/null 2>&1; then
-              echo "✅ Container is healthy!"
-              echo "🎉 Deployment successful!"
-              break
+            -p 8080:8080 \
+            -e SPRING_PROFILES_ACTIVE=production \
+            -e SPRING_R2DBC_URL="${{ steps.secrets.outputs.database-url }}" \
+            -e SPRING_R2DBC_USERNAME="${{ steps.secrets.outputs.database-username }}" \
+            -e SPRING_R2DBC_PASSWORD="${{ steps.secrets.outputs.database-password }}" \
+            -e SPRING_DATA_REDIS_URL="${{ steps.secrets.outputs.redis-url }}" \
+            -e SPRING_DATA_REDIS_PASSWORD="${{ steps.secrets.outputs.redis-password }}" \
+            -e JWT_SECRET="${{ steps.secrets.outputs.jwt-secret }}" \
+            -e SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID="${{ steps.secrets.outputs.oauth2-client-id }}" \
+            -e SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET="${{ steps.secrets.outputs.oauth2-client-secret }}" \
+            -e TZ=America/Sao_Paulo \
+            --health-cmd="curl -f http://localhost:8080/actuator/health || exit 1" \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Wait for service to be healthy
+        run: |
+          echo "Waiting for service to be healthy..."
+          for i in {1..30}; do
+            if docker inspect --format='{{.State.Health.Status}}' batepapo-service | grep -q "healthy"; then
+              echo "Service is healthy!"
+              exit 0
             fi
-            
-            if [ "$i" -eq 10 ]; then
-              echo "❌ Health check failed after 10 attempts"
-              echo "📋 Container logs (last 100 lines):"
-              docker logs batepapo-microservice --tail 100 || true
-              echo "📊 Container status:"
-              docker ps -a --filter name=batepapo-microservice || true
-              echo "🔍 Container health status:"
-              docker inspect batepapo-microservice --format='{{json .State.Health}}' || true
-              rm -rf "${SECRETS_DIR}" || true
-              exit 1
-            fi
-            sleep 20
+            echo "Attempt $i/30: Service not healthy yet, waiting..."
+            sleep 10
           done
-
-          echo "🧹 Cleaning up secrets and old images..."
-          rm -rf "${SECRETS_DIR}" || true
-          docker image prune -f --filter until=24h || true
-          
-          echo "✅ Production deployment completed successfully!"
+          echo "Service failed to become healthy within 5 minutes"
+          docker logs batepapo-service --tail 50
+          exit 1
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment..."
+          curl -f http://localhost:8080/actuator/health || {
+            echo "Health check failed"
+            docker logs batepapo-service --tail 50
+            exit 1
+          }
+          echo "Deployment verified successfully!"
 
   notify:
     runs-on: ubuntu-latest
-    name: 📢 Notification
+    name: 📢 Notify
+    needs: [build-and-test, security-scan, build-image, sign-image, deploy-production]
     if: always()
-    needs: [build-and-test, build-image, sign-image, deploy-production]
     steps:
-      - uses: 8398a7/action-slack@v3
-        if: always() && env.SLACK_WEBHOOK_URL != ''
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
-          channel: '#ci-cd-notifications'
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-          custom_payload: |
-            {
-              "username": "GitHub Actions",
-              "icon_emoji": ":speech_balloon:",
-              "attachments": [{
-                "color": "${{ job.status }}" == "success" ? "good" : "${{ job.status }}" == "failure" ? "danger" : "warning",
-                "fields": [{
-                  "title": "💬 Batepapo Microservice",
-                  "value": "Status: ${{ job.status }}\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}",
-                  "short": true
-                }]
-              }]
-            }
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

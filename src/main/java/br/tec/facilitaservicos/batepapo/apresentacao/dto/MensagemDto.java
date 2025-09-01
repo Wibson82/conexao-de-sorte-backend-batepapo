@@ -52,7 +52,7 @@ public record MensagemDto(
     
     @Schema(description = "Conteúdo textual da mensagem", 
             example = "Olá pessoal! Como estão hoje?",
-            required = true,
+            requiredMode = Schema.RequiredMode.REQUIRED,
             maxLength = 500)
     @NotBlank(message = "Conteúdo da mensagem é obrigatório")
     @Size(max = 500, message = "Mensagem não pode exceder 500 caracteres")
@@ -60,19 +60,19 @@ public record MensagemDto(
     
     @Schema(description = "Identificador do usuário que enviou a mensagem", 
             example = "12345",
-            required = true)
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "ID do usuário é obrigatório")
     Long usuarioId,
     
     @Schema(description = "Nome de exibição do usuário remetente", 
             example = "João Silva",
-            required = true)
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Nome do usuário é obrigatório")
     String usuarioNome,
     
     @Schema(description = "Identificador da sala onde a mensagem foi enviada", 
             example = "sala-geral",
-            required = true)
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Sala é obrigatória")
     String sala,
     

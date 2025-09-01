@@ -53,7 +53,7 @@ public record SalaDto(
     
     @Schema(description = "Nome da sala de chat", 
             example = "Sala Geral",
-            required = true,
+            requiredMode = Schema.RequiredMode.REQUIRED,
             maxLength = 50)
     @NotBlank(message = "Nome da sala é obrigatório")
     @Size(max = 50, message = "Nome da sala não pode exceder 50 caracteres")
@@ -68,7 +68,7 @@ public record SalaDto(
     @Schema(description = "Tipo da sala que define suas características", 
             example = "PUBLICA",
             allowableValues = {"PUBLICA", "PRIVADA", "MODERADA", "VIP", "TEMPORARIA"},
-            required = true)
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "Tipo da sala é obrigatório")
     TipoSala tipo,
     

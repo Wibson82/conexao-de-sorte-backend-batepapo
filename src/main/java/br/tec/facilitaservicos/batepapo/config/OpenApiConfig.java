@@ -59,6 +59,6 @@ public class OpenApiConfig {
                                                         .addMediaType("application/json", new io.swagger.v3.oas.models.media.MediaType()
                                                                 .schema(new Schema<>()
                                                                         .type("object")
-                                                                        .addProperty("status", new Schema<>().type("string").example("DOWN"))))))));
+                                                                        .addProperty("status", new Schema<>().type("string").example("DOWN")))))))));
     }
 }

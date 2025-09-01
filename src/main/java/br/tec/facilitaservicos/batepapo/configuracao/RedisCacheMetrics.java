@@ -9,6 +9,7 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.connection.ReturnType;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -64,15 +65,15 @@ public class RedisCacheMetrics {
         this.totalMessagesInCache = new AtomicLong(0);
         
         // Gauges para métricas em tempo real
-        Gauge.builder("chat.sessions.active")
+        Gauge.builder("chat.sessions.active", activeChatSessions, AtomicLong::doubleValue)
                 .description("Número de sessões de chat ativas")
                 .tag("service", applicationName)
-                .register(meterRegistry, activeChatSessions, AtomicLong::get);
+                .register(meterRegistry);
                 
-        Gauge.builder("chat.messages.cached")
+        Gauge.builder("chat.messages.cached", totalMessagesInCache, AtomicLong::doubleValue)
                 .description("Total de mensagens em cache")
                 .tag("service", applicationName)
-                .register(meterRegistry, totalMessagesInCache, AtomicLong::get);
+                .register(meterRegistry);
     }
 
     public RedisCacheManager instrumentedCacheManager() {
@@ -114,11 +115,11 @@ public class RedisCacheMetrics {
         try {
             // Contagem de chaves específicas do chat
             Long userOnlineKeys = redisTemplate.execute((RedisCallback<Long>) connection -> 
-                connection.eval("return #redis.call('keys', ARGV[1])", 0, (applicationName + ":chat:usuarios-online:*").getBytes())
+                connection.eval("return #redis.call('keys', ARGV[1])".getBytes(), ReturnType.INTEGER, 0, (applicationName + ":chat:usuarios-online:*").getBytes())
             );
             
             Long messageKeys = redisTemplate.execute((RedisCallback<Long>) connection -> 
-                connection.eval("return #redis.call('keys', ARGV[1])", 0, (applicationName + ":chat:mensagens:*").getBytes())
+                connection.eval("return #redis.call('keys', ARGV[1])".getBytes(), ReturnType.INTEGER, 0, (applicationName + ":chat:mensagens:*").getBytes())
             );
             
             if (userOnlineKeys != null) {

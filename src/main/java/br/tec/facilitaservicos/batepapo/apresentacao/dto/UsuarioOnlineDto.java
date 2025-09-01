@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import br.tec.facilitaservicos.batepapo.dominio.enums.StatusPresenca;
 import jakarta.validation.constraints.NotBlank;

@@ -1,0 +1,34 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.0.0
+
+# Ignore specific vulnerabilities with justification
+ignore:
+  # Example: Ignore low severity vulnerabilities in test dependencies
+  # SNYK-JAVA-ORGSPRINGFRAMEWORK-12345:
+  #   - '*':
+  #       reason: 'Test dependency only, not used in production'
+  #       expires: '2024-12-31T23:59:59.999Z'
+
+# Patches to apply to vulnerabilities
+patches: {}
+
+# Language-specific settings
+language-settings:
+  java:
+    # Enable license scanning
+    enableLicenseScan: true
+    # Maven-specific settings
+    maven:
+      # Include dev dependencies in scan
+      includeDevDependencies: false
+      # Exclude test scope dependencies from production scan
+      excludeTestScope: true
+
+# Project-specific configuration
+project-settings:
+  # Fail build on high severity vulnerabilities
+  failOnIssues: true
+  # Minimum severity threshold
+  severityThreshold: 'high'
+  # Monitor project for new vulnerabilities
+  monitor: true

@@ -35,6 +35,11 @@ spring:
   # Flyway desabilitado para testes (schema criado via @Sql)
   flyway:
     enabled: false
+    
+  # Inicialização SQL desabilitada para testes
+  sql:
+    init:
+      mode: never
 
   # ========================================
   # 🔐 SEGURANÇA JWT (MOCK)
