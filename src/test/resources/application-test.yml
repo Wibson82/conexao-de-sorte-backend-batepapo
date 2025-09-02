@@ -49,8 +49,10 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # JWT desabilitado para testes - usar @WithMockUser
-          enabled: false
+          # JWT mockado para testes
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+          issuer-uri: https://auth.conexaodesorte.com
+          audience: conexao-de-sorte
 
   # ========================================
   # 🚀 REDIS (MOCK/EMBARCADO)

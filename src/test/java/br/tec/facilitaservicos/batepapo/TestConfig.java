@@ -1,6 +1,7 @@
 package br.tec.facilitaservicos.batepapo;
 
 import br.tec.facilitaservicos.batepapo.config.TestR2dbcConfig;
+import br.tec.facilitaservicos.batepapo.config.TestSecurityConfig;
 import br.tec.facilitaservicos.batepapo.infraestrutura.cliente.AuthServiceClient;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -17,7 +18,7 @@ import java.util.Map;
  * Configuração de teste para mocks e beans simplificados
  */
 @TestConfiguration
-@Import(TestR2dbcConfig.class)
+@Import({TestR2dbcConfig.class, TestSecurityConfig.class})
 public class TestConfig {
 
     @Bean
