@@ -36,10 +36,11 @@ spring:
   flyway:
     enabled: false
     
-  # Inicialização SQL desabilitada para testes
+  # Inicialização SQL habilitada para testes
   sql:
     init:
-      mode: never
+      mode: always
+      schema-locations: classpath:schema.sql
 
   # ========================================
   # 🔐 SEGURANÇA JWT (MOCK)
@@ -90,17 +91,23 @@ chat:
   max-connections-per-user: 5
 
 # ========================================
-# 📝 LOGGING (MINIMIZADO)
+# 📝 LOGGING (OTIMIZADO PARA TESTES R2DBC)
 # ========================================
 logging:
   level:
     root: WARN
     br.tec.facilitaservicos.batepapo: DEBUG
+    # R2DBC e SQL logs habilitados para debug de testes
+    org.springframework.r2dbc: DEBUG
+    io.r2dbc.h2: DEBUG
+    io.r2dbc.spi: DEBUG
+    org.springframework.data.r2dbc: DEBUG
+    # Outros logs minimizados
     org.springframework.security: ERROR
     org.springframework.web: ERROR
-    org.springframework.r2dbc: ERROR
-    reactor.netty: ERROR
-    io.r2dbc: ERROR
+    reactor.netty: WARN
+    org.springframework.boot.autoconfigure: WARN
+    org.springframework.test: INFO
   pattern:
     console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([%thread]){faint} %clr(%logger{36}){cyan} - %msg%n"
 
@@ -123,14 +130,23 @@ resilience4j:
   circuitbreaker:
     instances:
       database:
-        enabled: false
+        registerHealthIndicator: false
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
       redis:
-        enabled: false
+        registerHealthIndicator: false
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
         
   ratelimiter:
     instances:
       chat-service:
-        enabled: false
+        registerHealthIndicator: false
+        limitForPeriod: 1000
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0s
 
 # ========================================
 # 🌐 CORS (PERMISSIVO PARA TESTES)

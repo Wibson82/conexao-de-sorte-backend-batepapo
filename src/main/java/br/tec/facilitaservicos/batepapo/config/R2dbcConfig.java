@@ -18,7 +18,7 @@ import org.springframework.transaction.ReactiveTransactionManager;
 import java.time.Duration;
 
 @Configuration
-@EnableR2dbcRepositories(basePackages = "br.tec.facilitaservicos.batepapo.repository")
+@EnableR2dbcRepositories(basePackages = "br.tec.facilitaservicos.batepapo.dominio.repositorio")
 public class R2dbcConfig  {
 
     @Value("${spring.r2dbc.url}")

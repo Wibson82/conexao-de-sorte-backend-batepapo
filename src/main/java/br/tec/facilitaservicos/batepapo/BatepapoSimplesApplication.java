@@ -13,7 +13,6 @@ import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
  * - Integração básica com Auth Service
  */
 @SpringBootApplication
-@EnableR2dbcRepositories
 public class BatepapoSimplesApplication {
 
     public static void main(String[] args) {

@@ -2,9 +2,9 @@ server:
   port: ${SERVER_PORT:8079}
   shutdown: graceful
   ssl:
-    enabled: ${SSL_ENABLED:false}
-    key-store: ${SSL_KEYSTORE_PATH:}
-    key-store-password: ${SSL_KEYSTORE_PASSWORD:}
+    enabled: ${conexao-de-sorte-ssl-enabled:false}
+    key-store: ${conexao-de-sorte-ssl-keystore-path:}
+    key-store-password: ${conexao-de-sorte-ssl-keystore-password:}
     key-store-type: PKCS12
   netty:
     connection-timeout: 20s
@@ -17,17 +17,32 @@ server:
 spring:
   application:
     name: batepapo
+  profiles:
+    default: prod
   main:
     allow-bean-definition-overriding: true
+    
+  # Azure Key Vault with manual configuration
+  cloud:
+    azure:
+      keyvault:
+        secret:
+          enabled: ${AZURE_KEYVAULT_ENABLED:true}
+          endpoint: ${AZURE_KEYVAULT_ENDPOINT:}
+      profile:
+        tenant-id: ${AZURE_TENANT_ID:}
+        subscription-id: ${AZURE_SUBSCRIPTION_ID:}
+        client-id: ${AZURE_CLIENT_ID:}
+        
   config:
     import:
       - optional:configtree:/etc/secrets/azure/
       - optional:configtree:/mnt/secrets/
       - optional:file:./secrets.properties
   r2dbc:
-    url: r2dbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}}
+    username: ${conexao-de-sorte-database-username:${DB_USERNAME}}
+    password: ${conexao-de-sorte-database-password:${DB_PASSWORD}}
     pool:
       initial-size: 5
       max-size: 30

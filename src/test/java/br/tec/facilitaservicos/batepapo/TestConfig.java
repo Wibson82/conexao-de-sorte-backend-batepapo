@@ -1,9 +1,11 @@
 package br.tec.facilitaservicos.batepapo;
 
+import br.tec.facilitaservicos.batepapo.config.TestR2dbcConfig;
 import br.tec.facilitaservicos.batepapo.infraestrutura.cliente.AuthServiceClient;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
@@ -15,6 +17,7 @@ import java.util.Map;
  * Configuração de teste para mocks e beans simplificados
  */
 @TestConfiguration
+@Import(TestR2dbcConfig.class)
 public class TestConfig {
 
     @Bean

@@ -28,6 +28,9 @@
         
         <!-- Testcontainers -->
         <testcontainers.version>1.21.3</testcontainers.version>
+        
+        <!-- Mockito -->
+        <mockito.version>5.13.0</mockito.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version> <!-- Adicionado para compatibilidade com Spring Boot 3.5.5 -->
     </properties>
 
@@ -214,6 +217,18 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-inline</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
@@ -289,12 +304,19 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>3.5.3</version>
                 <configuration>
                     <systemPropertyVariables>
                         <spring.profiles.active>test</spring.profiles.active>
                     </systemPropertyVariables>
-                    <argLine>@{argLine} -Xmx1g -XX:+UseG1GC -Djava.awt.headless=true -Dtestcontainers.reuse.enable=false</argLine>
+                    <argLine>
+                        @{argLine}
+                        -javaagent:${settings.localRepository}/org/mockito/mockito-inline/${mockito.version}/mockito-inline-${mockito.version}.jar
+                        -Xmx1g
+                        -XX:+UseG1GC
+                        -Djava.awt.headless=true
+                        -Dtestcontainers.reuse.enable=false
+                    </argLine>
                 </configuration>
             </plugin>
 
