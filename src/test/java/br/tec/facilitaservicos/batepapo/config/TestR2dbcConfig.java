@@ -1,13 +1,13 @@
 package br.tec.facilitaservicos.batepapo.config;
 
-import io.r2dbc.spi.ConnectionFactory;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
-import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.transaction.ReactiveTransactionManager;
+
+import io.r2dbc.spi.ConnectionFactory;
 
 /**
  * Configuração R2DBC específica para testes
@@ -19,7 +19,6 @@ import org.springframework.transaction.ReactiveTransactionManager;
  */
 @TestConfiguration
 @Profile("test")
-@EnableR2dbcRepositories(basePackages = "br.tec.facilitaservicos.batepapo.dominio.repositorio")
 public class TestR2dbcConfig {
 
     /**

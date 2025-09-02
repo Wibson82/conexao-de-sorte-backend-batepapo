@@ -29,8 +29,6 @@
         <!-- Testcontainers -->
         <testcontainers.version>1.21.3</testcontainers.version>
         
-        <!-- Mockito -->
-        <mockito.version>5.13.0</mockito.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version> <!-- Adicionado para compatibilidade com Spring Boot 3.5.5 -->
     </properties>
 
@@ -121,7 +119,6 @@
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-reactor</artifactId>
-            <version>2.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.retry</groupId>
@@ -217,18 +214,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <version>${mockito.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-inline</artifactId>
-            <version>${mockito.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
@@ -311,7 +296,6 @@
                     </systemPropertyVariables>
                     <argLine>
                         @{argLine}
-                        -javaagent:${settings.localRepository}/org/mockito/mockito-inline/${mockito.version}/mockito-inline-${mockito.version}.jar
                         -Xmx1g
                         -XX:+UseG1GC
                         -Djava.awt.headless=true
@@ -387,7 +371,6 @@
             <plugin>
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-maven-plugin</artifactId>
-                <version>10.21.0</version>
                 <configuration>
                     <driver>com.mysql.cj.jdbc.Driver</driver>
                     <locations>
