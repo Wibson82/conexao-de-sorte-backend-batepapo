@@ -98,6 +98,7 @@ spring:
         jwt:
           jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
           issuer-uri: ${JWT_ISSUER:https://auth.conexaodesorte.com}
+          audience: ${JWT_AUDIENCE:conexao-de-sorte}
   jackson:
     time-zone: America/Sao_Paulo
     locale: pt_BR

@@ -61,7 +61,7 @@ jobs:
       - name: Run tests with coverage verification
         run: ./mvnw clean verify -Dspring.profiles.active=test
       - name: Build application
-        run: ./mvnw clean package -DskipTests -Dspring.profiles.active=production
+        run: ./mvnw clean package -DskipTests -Dspring.profiles.active=prod
       - name: Upload JaCoCo Coverage Reports
         uses: actions/upload-artifact@v4
         with:
@@ -232,7 +232,7 @@ jobs:
             --network conexao-network \
             --restart unless-stopped \
             -p 8080:8080 \
-            -e SPRING_PROFILES_ACTIVE=production \
+            -e SPRING_PROFILES_ACTIVE=prod \
             -e SPRING_R2DBC_URL="${{ steps.secrets.outputs.database-url }}" \
             -e SPRING_R2DBC_USERNAME="${{ steps.secrets.outputs.database-username }}" \
             -e SPRING_R2DBC_PASSWORD="${{ steps.secrets.outputs.database-password }}" \
