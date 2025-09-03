@@ -1,5 +1,13 @@
 name: 💬 Batepapo Microservice - CI/CD Pipeline
 
+# Required GitHub Secrets:
+# - AZURE_CLIENT_ID
+# - AZURE_KEYVAULT_ENDPOINT  
+# - AZURE_KEYVAULT_NAME
+# - AZURE_SUBSCRIPTION_ID
+# - AZURE_TENANT_ID
+# - SNYK_TOKEN (optional for security scanning)
+
 on:
   push:
     branches: [ main ]
@@ -197,21 +205,30 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment:
       name: production
-      url: https://api.conexaodesorte.com.br/batepapo/health
+      url: https://api.conexaodesorte.com.br/batepapo/actuator/health
     steps:
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Retrieve secrets from Azure Key Vault
         uses: Azure/get-keyvault-secrets@v1
         with:
-          keyvault: "kv-conexao-de-sorte-prod"
+          keyvault: "${AZURE_KEYVAULT_NAME}"
           secrets: |
-            database-url
-            database-username
-            database-password
-            redis-url
-            redis-password
-            jwt-secret
-            oauth2-client-id
-            oauth2-client-secret
+            conexao-de-sorte-database-r2dbc-url
+            conexao-de-sorte-database-username
+            conexao-de-sorte-database-password
+            conexao-de-sorte-redis-host
+            conexao-de-sorte-redis-port
+            conexao-de-sorte-redis-password
+            conexao-de-sorte-redis-database
+            conexao-de-sorte-jwt-jwks-uri
+            conexao-de-sorte-jwt-issuer
+            conexao-de-sorte-cors-allowed-origins
+            conexao-de-sorte-cors-allow-credentials
         id: secrets
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -233,18 +250,21 @@ jobs:
             --name batepapo-service \
             --network conexao-network \
             --restart unless-stopped \
-            -p 8080:8080 \
+            -p 8079:8079 \
             -e SPRING_PROFILES_ACTIVE=prod \
-            -e SPRING_R2DBC_URL="${{ steps.secrets.outputs.database-url }}" \
-            -e SPRING_R2DBC_USERNAME="${{ steps.secrets.outputs.database-username }}" \
-            -e SPRING_R2DBC_PASSWORD="${{ steps.secrets.outputs.database-password }}" \
-            -e SPRING_DATA_REDIS_URL="${{ steps.secrets.outputs.redis-url }}" \
-            -e SPRING_DATA_REDIS_PASSWORD="${{ steps.secrets.outputs.redis-password }}" \
-            -e JWT_SECRET="${{ steps.secrets.outputs.jwt-secret }}" \
-            -e SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID="${{ steps.secrets.outputs.oauth2-client-id }}" \
-            -e SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET="${{ steps.secrets.outputs.oauth2-client-secret }}" \
+            -e conexao-de-sorte-database-r2dbc-url="${{ steps.secrets.outputs.conexao-de-sorte-database-r2dbc-url }}" \
+            -e conexao-de-sorte-database-username="${{ steps.secrets.outputs.conexao-de-sorte-database-username }}" \
+            -e conexao-de-sorte-database-password="${{ steps.secrets.outputs.conexao-de-sorte-database-password }}" \
+            -e conexao-de-sorte-redis-host="${{ steps.secrets.outputs.conexao-de-sorte-redis-host }}" \
+            -e conexao-de-sorte-redis-port="${{ steps.secrets.outputs.conexao-de-sorte-redis-port }}" \
+            -e conexao-de-sorte-redis-password="${{ steps.secrets.outputs.conexao-de-sorte-redis-password }}" \
+            -e conexao-de-sorte-redis-database="${{ steps.secrets.outputs.conexao-de-sorte-redis-database }}" \
+            -e conexao-de-sorte-jwt-jwks-uri="${{ steps.secrets.outputs.conexao-de-sorte-jwt-jwks-uri }}" \
+            -e conexao-de-sorte-jwt-issuer="${{ steps.secrets.outputs.conexao-de-sorte-jwt-issuer }}" \
+            -e conexao-de-sorte-cors-allowed-origins="${{ steps.secrets.outputs.conexao-de-sorte-cors-allowed-origins }}" \
+            -e conexao-de-sorte-cors-allow-credentials="${{ steps.secrets.outputs.conexao-de-sorte-cors-allow-credentials }}" \
             -e TZ=America/Sao_Paulo \
-            --health-cmd="curl -f http://localhost:8080/actuator/health || exit 1" \
+            --health-cmd="curl -f http://localhost:8079/actuator/health || exit 1" \
             --health-interval=30s \
             --health-timeout=10s \
             --health-retries=3 \
@@ -266,7 +286,7 @@ jobs:
       - name: Verify deployment
         run: |
           echo "Verifying deployment..."
-          curl -f http://localhost:8080/actuator/health || {
+          curl -f http://localhost:8079/actuator/health || {
             echo "Health check failed"
             docker logs batepapo-service --tail 50
             exit 1

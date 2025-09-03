@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8079}
+  port: ${conexao-de-sorte-server-port:8083}
   shutdown: graceful
   ssl:
     enabled: ${conexao-de-sorte-ssl-enabled:false}
@@ -21,18 +21,6 @@ spring:
     default: prod
   main:
     allow-bean-definition-overriding: true
-    
-  # Azure Key Vault with manual configuration
-  # cloud:
-  #   azure:
-  #     keyvault:
-  #       secret:
-  #         enabled: ${AZURE_KEYVAULT_ENABLED:true}
-  #         endpoint: ${AZURE_KEYVAULT_ENDPOINT:}
-  #     profile:
-  #       tenant-id: ${AZURE_TENANT_ID:}
-  #       subscription-id: ${AZURE_SUBSCRIPTION_ID:}
-  #       client-id: ${AZURE_CLIENT_ID:}
         
   config:
     import:
@@ -53,18 +41,18 @@ spring:
       validation-query: SELECT 1
   flyway:
     enabled: true
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}
-    user: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${conexao-de-sorte-database-flyway-url:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}}
+    user: ${conexao-de-sorte-database-username:${DB_USERNAME}}
+    password: ${conexao-de-sorte-database-password:${DB_PASSWORD}}
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      database: ${REDIS_DB_CHAT:2}
+      host: ${conexao-de-sorte-redis-host:localhost}
+      port: ${conexao-de-sorte-redis-port:6379}
+      password: ${conexao-de-sorte-redis-password:}
+      database: ${conexao-de-sorte-redis-database:2}
       timeout: 3000ms
       connect-timeout: 10000ms
       lettuce:
@@ -96,8 +84,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
-          issuer-uri: ${JWT_ISSUER:https://auth.conexaodesorte.com}
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8081/.well-known/jwks.json}
+          issuer-uri: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
   jackson:
     time-zone: America/Sao_Paulo
     locale: pt_BR
@@ -135,9 +123,9 @@ management:
     enabled: true
     sampling:
       probability: ${TRACING_PROBABILITY:0.1}
-  zipkin:
+  otlp:
     tracing:
-      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
 springdoc:
   api-docs:
@@ -182,7 +170,7 @@ spring:
     clean-disabled: true
 
 server:
-  port: 8079
+  port: ${conexao-de-sorte-server-port:8083}
 
 management:
   endpoint:

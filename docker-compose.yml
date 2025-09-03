@@ -27,23 +27,26 @@ services:
     container_name: batepapo-microservice
     restart: unless-stopped
     ports:
-      - "8083:8083"
+      - "8079:8079"
     environment:
       # Database
-      - DB_HOST=batepapo-mysql
-      - DB_PORT=3306
-      - DB_NAME=conexao_sorte_batepapo
-      - DB_USERNAME=batepapo_user
-      - DB_PASSWORD=batepapo_pass123!
+      - conexao-de-sorte-database-r2dbc-url=r2dbc:mysql://batepapo-mysql:3306/conexao_sorte_batepapo
+      - conexao-de-sorte-database-username=batepapo_user
+      - conexao-de-sorte-database-password=batepapo_pass123!
       
       # Redis
-      - REDIS_HOST=batepapo-redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=redis_pass123!
+      - conexao-de-sorte-redis-host=batepapo-redis
+      - conexao-de-sorte-redis-port=6379
+      - conexao-de-sorte-redis-password=redis_pass123!
+      - conexao-de-sorte-redis-database=2
       
       # JWT
-      - JWT_JWKS_URI=http://autenticacao-service:8081/.well-known/jwks.json
-      - JWT_ISSUER=https://auth.conexaodesorte.com
+      - conexao-de-sorte-jwt-jwks-uri=http://autenticacao-service:8081/.well-known/jwks.json
+      - conexao-de-sorte-jwt-issuer=https://auth.conexaodesorte.com
+      
+      # CORS
+      - conexao-de-sorte-cors-allowed-origins=http://localhost:*,https://*.conexaodesorte.com
+      - conexao-de-sorte-cors-allow-credentials=true
       
       # Features
       - FEATURE_BATEPAPO_MS=true
@@ -74,7 +77,7 @@ services:
       - batepapo-mysql
       - batepapo-redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8079/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
