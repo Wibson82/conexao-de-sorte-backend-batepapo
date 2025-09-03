@@ -63,7 +63,7 @@ class TestcontainersDatabaseTest {
                         .fetch()
                         .rowsUpdated()
         )
-        .expectNext(0) // CREATE TABLE retorna 0 rows updated
+        .expectNext(0L) // CREATE TABLE retorna 0 rows updated
         .verifyComplete();
 
         // Inserir dados de teste
@@ -74,7 +74,7 @@ class TestcontainersDatabaseTest {
                         .fetch()
                         .rowsUpdated()
         )
-        .expectNext(1)
+        .expectNext(1L)
         .verifyComplete();
 
         // Consultar dados inseridos
@@ -110,7 +110,7 @@ class TestcontainersDatabaseTest {
                         .fetch()
                         .rowsUpdated()
         )
-        .expectNext(0)
+        .expectNext(0L)
         .verifyComplete();
 
         // Inserir múltiplas salas
@@ -131,7 +131,7 @@ class TestcontainersDatabaseTest {
                             .fetch()
                             .rowsUpdated()
             )
-            .expectNext(1)
+            .expectNext(1L)
             .verifyComplete();
         }
 
@@ -170,7 +170,7 @@ class TestcontainersDatabaseTest {
                         .fetch()
                         .rowsUpdated()
         )
-        .expectNext(0)
+        .expectNext(0L)
         .verifyComplete();
 
         // Inserir usuário válido
@@ -181,7 +181,7 @@ class TestcontainersDatabaseTest {
                         .fetch()
                         .rowsUpdated()
         )
-        .expectNext(1)
+        .expectNext(1L)
         .verifyComplete();
 
         // Tentar inserir usuário com username duplicado (deve falhar)
@@ -219,7 +219,7 @@ class TestcontainersDatabaseTest {
                         .fetch()
                         .rowsUpdated()
         )
-        .expectNext(0)
+        .expectNext(0L)
         .verifyComplete();
 
         // Inserir dados de teste
@@ -235,7 +235,7 @@ class TestcontainersDatabaseTest {
                             .fetch()
                             .rowsUpdated()
             )
-            .expectNext(1)
+            .expectNext(1L)
             .verifyComplete();
         }
 
