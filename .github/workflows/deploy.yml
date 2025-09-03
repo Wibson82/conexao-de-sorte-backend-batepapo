@@ -312,8 +312,8 @@ jobs:
             --name "batepapo-microservice" \
             --network conexao-network \
             --restart unless-stopped \
-            -p "8081:8081" \
-            --health-cmd="curl -f http://localhost:8081/actuator/health/readiness && curl -f http://localhost:8081/actuator/health/liveness || exit 1" \
+            -p "8089:8080" \
+            --health-cmd="curl -f http://localhost:8089/actuator/health/readiness && curl -f http://localhost:8089/actuator/health/liveness || exit 1" \
             --health-interval=30s \
             --health-timeout=10s \
             --health-retries=5 \
@@ -339,7 +339,7 @@ jobs:
           TIMEOUT=180
           ELAPSED=0
           while [ $ELAPSED -lt $TIMEOUT ]; do
-            if docker exec batepapo-microservice curl -f -s http://localhost:8081/actuator/health/readiness >/dev/null 2>&1; then
+            if docker exec batepapo-microservice curl -f -s http://localhost:8089/actuator/health/readiness >/dev/null 2>&1; then
               echo "✅ Service is ready and healthy!"
               break
             fi

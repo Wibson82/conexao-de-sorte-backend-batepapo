@@ -50,7 +50,7 @@ spring:
       resourceserver:
         jwt:
           # JWT mockado para testes
-          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+          jwk-set-uri: http://localhost:8089/.well-known/jwks.json
           issuer-uri: https://auth.conexaodesorte.com
           audience: conexao-de-sorte
 
@@ -164,7 +164,7 @@ cors:
 # ========================================
 services:
   auth:
-    url: http://localhost:8081
+    url: http://localhost:8089
     endpoints:
       validate: /auth/validate
       users: /rest/v1/users

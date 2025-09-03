@@ -187,7 +187,7 @@ REDIS_PORT=6379
 REDIS_PASSWORD=redis_pass123!
 
 # JWT
-JWT_JWKS_URI=http://localhost:8081/.well-known/jwks.json
+JWT_JWKS_URI=http://localhost:8089/.well-known/jwks.json
 JWT_ISSUER=https://auth.conexaodesorte.com
 
 # Features

@@ -55,7 +55,7 @@ batepapo/
 ### 🔗 **Integrações Via API**
 ```yaml
 # Verificar usuário online
-GET http://auth-microservice:8081/rest/v1/users/{id}/status
+GET http://auth-microservice:8089/rest/v1/users/{id}/status
 
 # Enviar notificação
 POST http://notifications-microservice:8084/rest/v1/notifications

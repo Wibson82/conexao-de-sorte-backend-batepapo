@@ -41,7 +41,7 @@ services:
       - conexao-de-sorte-redis-database=2
       
       # JWT
-      - conexao-de-sorte-jwt-jwks-uri=http://autenticacao-service:8081/.well-known/jwks.json
+      - conexao-de-sorte-jwt-jwks-uri=http://autenticacao-service:8089/.well-known/jwks.json
       - conexao-de-sorte-jwt-issuer=https://auth.conexaodesorte.com
       
       # CORS
