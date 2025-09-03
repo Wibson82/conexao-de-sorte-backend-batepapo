@@ -1,0 +1,128 @@
+# ============================================================================
+# 🧪 CONFIGURAÇÃO DE TESTES COM TESTCONTAINERS - JAVA 24
+# ============================================================================
+#
+# Configuração específica para testes com Testcontainers:
+# - MySQL container real
+# - Redis container (se necessário)
+# - Configurações otimizadas para containers
+# - Sem Mockito
+#
+# @author Sistema de Testes Java 24
+# @version 1.0
+# @since 2024
+# ============================================================================
+
+# ========================================
+# 🏷️ CONFIGURAÇÕES GERAIS
+# ========================================
+spring:
+  application:
+    name: batepapo-microservice-testcontainers
+  main:
+    banner-mode: off
+    
+  # ========================================
+  # 🗄️ BANCO DE DADOS (TESTCONTAINERS MySQL)
+  # ========================================
+  # As configurações de R2DBC serão definidas dinamicamente pelo teste
+  # usando @DynamicPropertySource com Testcontainers
+  
+  # Flyway desabilitado para Testcontainers (schema criado via SQL)
+  flyway:
+    enabled: false
+    
+  # ========================================
+  # 🔐 SEGURANÇA JWT (DESABILITADA)
+  # ========================================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # JWT desabilitado para testes de integração
+          jwk-set-uri: http://localhost:9999/.well-known/jwks.json
+
+  # ========================================
+  # 🚀 REDIS (MOCK/EMBARCADO)
+  # ========================================
+  data:
+    redis:
+      # Configurações serão sobrescritas se necessário
+      host: localhost
+      port: 6379
+      timeout: 1s
+
+# ========================================
+# 🌐 SERVIDOR (PORTA ALEATÓRIA)
+# ========================================
+server:
+  port: 0
+
+# ========================================
+# 🚦 FEATURE FLAGS (TESTES)
+# ========================================
+feature:
+  batepapo-ms: true
+  websocket: false
+  sse: false
+  message-persistence: true
+  redis-streams: false
+  rate-limiting: false
+
+# ========================================
+# 💬 CONFIGURAÇÕES DE CHAT (TESTE)
+# ========================================
+chat:
+  max-message-length: 500
+  max-rooms-per-user: 10
+  message-retention-days: 1
+  online-timeout-minutes: 1
+  heartbeat-interval-seconds: 5
+  max-connections-per-user: 5
+
+# ========================================
+# 📝 LOGGING (OTIMIZADO PARA TESTCONTAINERS)
+# ========================================
+logging:
+  level:
+    root: WARN
+    br.tec.facilitaservicos.batepapo: INFO
+    # Testcontainers logs
+    org.testcontainers: INFO
+    com.github.dockerjava: WARN
+    # R2DBC logs para debug
+    org.springframework.r2dbc: DEBUG
+    # Outros logs minimizados
+    org.springframework.security: ERROR
+    org.springframework.web: WARN
+    reactor.netty: WARN
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([%thread]){faint} %clr(%logger{36}){cyan} - %msg%n"
+
+# ========================================
+# 📊 ACTUATOR (SIMPLIFICADO)
+# ========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ========================================
+# 🧪 CONFIGURAÇÕES ESPECÍFICAS DE TESTE
+# ========================================
+test:
+  containers:
+    mysql:
+      image: "mysql:8.0"
+      database: "batepapo_test"
+      username: "testuser"
+      password: "testpass"
+    
+  timeouts:
+    container-startup: 60s
+    database-ready: 30s
+    web-request: 5s
