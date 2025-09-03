@@ -21,6 +21,24 @@ spring:
     default: prod
   main:
     allow-bean-definition-overriding: true
+    
+  # Azure Key Vault Configuration
+  cloud:
+    azure:
+      keyvault:
+        secret:
+          enabled: ${AZURE_KEYVAULT_ENABLED:true}
+          endpoint: ${AZURE_KEYVAULT_ENDPOINT:}
+          property-sources:
+            - name: ${AZURE_KEYVAULT_NAME:conexao-de-sorte-keyvault}
+              endpoint: ${AZURE_KEYVAULT_ENDPOINT:}
+              case-sensitive: false
+      profile:
+        tenant-id: ${AZURE_TENANT_ID:}
+        subscription-id: ${AZURE_SUBSCRIPTION_ID:}
+      credential:
+        client-id: ${AZURE_CLIENT_ID:}
+        managed-identity-enabled: false
         
   config:
     import:
