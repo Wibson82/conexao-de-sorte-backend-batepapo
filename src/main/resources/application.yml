@@ -1,5 +1,5 @@
 server:
-  port: ${conexao-de-sorte-server-port:8083}
+  port: ${conexao-de-sorte-server-port:8079}
   shutdown: graceful
   ssl:
     enabled: ${conexao-de-sorte-ssl-enabled:false}
@@ -70,7 +70,7 @@ spring:
       host: ${conexao-de-sorte-redis-host:localhost}
       port: ${conexao-de-sorte-redis-port:6379}
       password: ${conexao-de-sorte-redis-password:}
-      database: ${conexao-de-sorte-redis-database:2}
+      database: ${conexao-de-sorte-redis-database:4}
       timeout: 3000ms
       connect-timeout: 10000ms
       lettuce:
@@ -102,7 +102,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8089/.well-known/jwks.json}
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8081/.well-known/jwks.json}
           issuer-uri: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
   jackson:
     time-zone: America/Sao_Paulo
@@ -188,7 +188,7 @@ spring:
     clean-disabled: true
 
 server:
-  port: ${conexao-de-sorte-server-port:8083}
+  port: ${conexao-de-sorte-server-port:8079}
 
 management:
   endpoint:

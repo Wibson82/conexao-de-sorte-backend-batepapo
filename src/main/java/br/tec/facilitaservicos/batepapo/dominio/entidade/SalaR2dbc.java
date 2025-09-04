@@ -7,7 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
-import br.tec.facilitaservicos.batepapo.dominio.entidade.base.ReactiveAuditableEntity;
+import br.tec.facilitaservicos.common.entity.ReactiveAuditableEntity;
 import br.tec.facilitaservicos.batepapo.dominio.enums.StatusSala;
 import br.tec.facilitaservicos.batepapo.dominio.enums.TipoSala;
 import jakarta.validation.constraints.NotBlank;

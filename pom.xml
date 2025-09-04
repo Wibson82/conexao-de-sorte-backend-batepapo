@@ -212,6 +212,13 @@
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
 
+        <!-- Biblioteca compartilhada de entidades -->
+        <dependency>
+            <groupId>br.tec.facilitaservicos</groupId>
+            <artifactId>common-entities</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
         <!-- Jackson -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
