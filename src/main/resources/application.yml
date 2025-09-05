@@ -40,7 +40,8 @@ spring:
       - optional:configtree:/mnt/secrets/
       - optional:file:./secrets.properties
   r2dbc:
-    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}
+    # Preferencialmente usa -database-r2dbc-url; mantém compat com -database-url
+    url: ${conexao-de-sorte-database-r2dbc-url:${conexao-de-sorte-database-url:r2dbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}}
     username: ${conexao-de-sorte-database-username:}
     password: ${conexao-de-sorte-database-password:}
     pool:
