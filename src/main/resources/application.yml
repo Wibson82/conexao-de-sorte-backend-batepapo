@@ -46,9 +46,9 @@ spring:
       - optional:configtree:/mnt/secrets/
       - optional:file:./secrets.properties
   r2dbc:
-    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}}
-    username: ${conexao-de-sorte-database-username:${DB_USERNAME}}
-    password: ${conexao-de-sorte-database-password:${DB_PASSWORD}}
+    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}
+    username: ${conexao-de-sorte-database-username:}
+    password: ${conexao-de-sorte-database-password:}
     pool:
       initial-size: 5
       max-size: 30
@@ -59,9 +59,9 @@ spring:
       validation-query: SELECT 1
   flyway:
     enabled: true
-    url: ${conexao-de-sorte-database-flyway-url:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:conexao_sorte_batepapo}}
-    user: ${conexao-de-sorte-database-username:${DB_USERNAME}}
-    password: ${conexao-de-sorte-database-password:${DB_PASSWORD}}
+    url: ${conexao-de-sorte-database-flyway-url:jdbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}
+    user: ${conexao-de-sorte-database-username:}
+    password: ${conexao-de-sorte-database-password:}
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
