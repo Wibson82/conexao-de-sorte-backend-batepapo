@@ -103,6 +103,6 @@ public class CacheConfig {
             .hashValue(valueSerializer)
             .build();
 
-        return new ReactiveRedisTemplate<>(connectionFactory, context);
+        return new ReactiveRedisTemplate<String, Object>(connectionFactory, context);
     }
 }
