@@ -1,1 +1,158 @@
-# =============================================================================# CONFIGURAÇÃO AZURE - BATE-PAPO MICROSERVICE# =============================================================================# Microserviço responsável pelo sistema de chat e comunicação em tempo real# Compatible with Spring Boot 3.5.5# =============================================================================spring:  config:    activate:      on-profile: azure    import:      - "optional:configtree:/run/secrets/"  # ===== SPRING CLOUD AZURE - DISABLED FOR CONFIGTREE =====  cloud:    azure:      keyvault:        secret:          enabled: false  # Usando configtree para maior segurança  # ===== R2DBC (REACTIVE) DATABASE CONFIGURATION =====  r2dbc:    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:pool:mysql://conexao-mysql:3306/conexao_de_sorte?tls=false&zeroDate=use_null&serverZoneId=America/Sao_Paulo}    username: ${conexao-de-sorte-database-username:chat_user}    password: ${conexao-de-sorte-database-password:}    pool:      enabled: true      initial-size: 5      max-size: 20      max-idle-time: 30s  # ===== FLYWAY CONFIGURATION =====  flyway:    enabled: true    url: ${conexao-de-sorte-database-flyway-url:jdbc:mysql://conexao-mysql:3306/conexao_de_sorte?tls=false&zeroDate=use_null&serverZoneId=America/Sao_Paulo}    user: ${conexao-de-sorte-database-username:chat_user}    password: ${conexao-de-sorte-database-password:}    locations: classpath:db/migration    baseline-on-migrate: true    validate-on-migrate: false  # ===== REDIS CONFIGURATION =====  data:    redis:      host: ${conexao-de-sorte-redis-host:redis}      port: ${conexao-de-sorte-redis-port:6379}      password: ${conexao-de-sorte-redis-password:}      database: ${conexao-de-sorte-redis-database:1}  # DB 1 para batepapo      timeout: 2000ms      lettuce:        pool:          enabled: true          max-active: 20  # Chat precisa de mais conexões simultâneas          max-idle: 8          min-idle: 2     # Manter conexões mínimas ativas          max-wait: 3000ms  # ===== SECURITY JWT CONFIGURATION =====  security:    oauth2:      resourceserver:        jwt:          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8089/.well-known/jwks.json}          issuer-uri: ${conexao-de-sorte-jwt-issuer:https://conexaodesorte.com.br}  # ===== JACKSON CONFIGURATION =====  jackson:    time-zone: America/Sao_Paulo    locale: pt_BR# ===== CHAT SPECIFIC CONFIGURATION =====chat:  websocket:    allowed-origins:       - https://conexaodesorte.com.br      - https://www.conexaodesorte.com.br    endpoint: /ws/chat    message-size-limit: 1024  # 1KB por mensagem    buffer-size: 8192      rooms:    default: general    max-users-per-room: 100    auto-create: true    inactive-timeout: PT2H      moderation:    enabled: true    profanity-filter: true    spam-detection: true    rate-limit:      messages-per-minute: 30      warnings-before-timeout: 3      timeout-duration: PT10M      history:    enabled: true    retention-days: 30    max-messages-per-room: 10000      notifications:    mention-enabled: true    private-message-enabled: true    join-leave-enabled: false# ===== LOGGING =====logging:  level:    '[com.azure]': INFO    '[com.azure.security.keyvault]': INFO    '[org.springframework.cloud.azure]': INFO    '[org.springframework.websocket]': DEBUG    '[org.springframework.messaging]': DEBUG    '[br.tec.facilitaservicos.batepapo]': DEBUG# ===== MANAGEMENT ENDPOINTS - SPRING BOOT 3.5.5 =====management:  endpoints:    web:      exposure:        include: health,info,metrics,prometheus  endpoint:    health:      show-details: when-authorized      roles: ADMIN    info:      access: when-authorized    env:      access: never    configprops:      access: never    beans:      access: never    conditions:      access: never    mappings:      access: never    threaddump:      access: never    heapdump:      access: never    startup:      access: never  health:    db:      enabled: true    redis:      enabled: true# ===== SERVER CONFIGURATION =====server:  port: ${conexao-de-sorte-server-port:8083}  servlet:    context-path: /rest/v1/chat  compression:    enabled: true  http2:    enabled: true  # Configuração específica para WebSocket - Spring Boot 3.5.5  max-http-request-header-size: 16384
+# =============================================================================
+# CONFIGURAÇÃO AZURE - BATE-PAPO MICROSERVICE
+# =============================================================================
+# Microserviço responsável pelo sistema de chat e comunicação em tempo real
+# Compatível com Spring Boot 3.5.5
+# Perfil: azure
+# =============================================================================
+
+spring:
+  config:
+    activate:
+      on-profile: azure
+    import:
+      - optional:configtree:/run/secrets/
+
+  # ===== SPRING CLOUD AZURE - DESABILITADO (usando configtree) =====
+  cloud:
+    azure:
+      keyvault:
+        secret:
+          enabled: false
+
+  # ===== R2DBC (REACTIVE) DATABASE CONFIGURATION =====
+  r2dbc:
+    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:pool:mysql://mysql-proxy:6033/conexao_de_sorte?tls=true&zeroDate=use_null&serverZoneId=America/Sao_Paulo&allowPublicKeyRetrieval=false}
+    username: ${conexao-de-sorte-database-username:chat_user}
+    password: ${conexao-de-sorte-database-password:}
+    pool:
+      enabled: true
+      initial-size: 5
+      max-size: 20
+      max-idle-time: 30s
+
+  # ===== FLYWAY CONFIGURATION =====
+  flyway:
+    enabled: true
+    url: ${conexao-de-sorte-database-flyway-url:jdbc:mysql://mysql-proxy:6033/conexao_de_sorte?useSSL=true&zeroDate=use_null&serverZoneId=America/Sao_Paulo&allowPublicKeyRetrieval=false}
+    user: ${conexao-de-sorte-database-username:chat_user}
+    password: ${conexao-de-sorte-database-password:}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: false
+
+  # ===== REDIS CONFIGURATION =====
+  data:
+    redis:
+      host: ${conexao-de-sorte-redis-host:redis}
+      port: ${conexao-de-sorte-redis-port:6379}
+      password: ${conexao-de-sorte-redis-password:}
+      database: ${conexao-de-sorte-redis-database:1}  # DB 1 para batepapo
+      timeout: 2000ms
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 20   # Chat precisa de mais conexões simultâneas
+          max-idle: 8
+          min-idle: 2      # Manter conexões mínimas ativas
+          max-wait: 3000ms
+
+  # ===== SECURITY JWT CONFIGURATION =====
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8089/.well-known/jwks.json}
+          issuer-uri: ${conexao-de-sorte-jwt-issuer:https://conexaodesorte.com.br}
+
+  # ===== JACKSON CONFIGURATION =====
+  jackson:
+    time-zone: America/Sao_Paulo
+    locale: pt_BR
+
+# ===== CHAT SPECIFIC CONFIGURATION =====
+chat:
+  websocket:
+    allowed-origins:
+      - https://conexaodesorte.com.br
+      - https://www.conexaodesorte.com.br
+    endpoint: /ws/chat
+    message-size-limit: 1024   # 1KB por mensagem
+    buffer-size: 8192
+  rooms:
+    default: general
+    max-users-per-room: 100
+    auto-create: true
+    inactive-timeout: PT2H
+  moderation:
+    enabled: true
+    profanity-filter: true
+    spam-detection: true
+  rate-limit:
+    messages-per-minute: 30
+    warnings-before-timeout: 3
+    timeout-duration: PT10M
+  history:
+    enabled: true
+    retention-days: 30
+    max-messages-per-room: 10000
+  notifications:
+    mention-enabled: true
+    private-message-enabled: true
+    join-leave-enabled: false
+
+# ===== LOGGING =====
+logging:
+  level:
+    '[com.azure]': INFO
+    '[com.azure.security.keyvault]': INFO
+    '[org.springframework.cloud.azure]': INFO
+    '[org.springframework.websocket]': DEBUG
+    '[org.springframework.messaging]': DEBUG
+    '[br.tec.facilitaservicos.batepapo]': DEBUG
+
+# ===== MANAGEMENT ENDPOINTS - SPRING BOOT 3.5.5 =====
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      roles: ADMIN
+    info:
+      access: when-authorized
+    env:
+      access: never
+    configprops:
+      access: never
+    beans:
+      access: never
+    conditions:
+      access: never
+    mappings:
+      access: never
+    threaddump:
+      access: never
+    heapdump:
+      access: never
+    startup:
+      access: never
+  health:
+    db:
+      enabled: true
+    redis:
+      enabled: true
+
+# ===== SERVER CONFIGURATION =====
+server:
+  port: ${conexao-de-sorte-server-port:8083}
+  servlet:
+    context-path: /rest/v1/chat
+  compression:
+    enabled: true
+  http2:
+    enabled: true
+  # Configuração específica para WebSocket - Spring Boot 3.5.5
+  max-http-request-header-size: 16384
