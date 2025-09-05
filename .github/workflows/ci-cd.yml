@@ -255,6 +255,41 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Load Azure Key Vault secrets (Redis)
+        run: |
+          set -euo pipefail
+          VAULT_ENDPOINT="${{ secrets.AZURE_KEYVAULT_ENDPOINT }}"
+          if [[ "$VAULT_ENDPOINT" =~ https://([^.]+)\.vault\.azure\.net ]]; then
+            VAULT="${BASH_REMATCH[1]}"
+          else
+            echo "ERROR: Invalid AZURE_KEYVAULT_ENDPOINT format: $VAULT_ENDPOINT" >&2
+            echo "Expected format: https://<vault-name>.vault.azure.net/" >&2
+            exit 1
+          fi
+          echo "Using Key Vault: $VAULT ($VAULT_ENDPOINT)" >&2
+          get() {
+            local name="$1"; shift || true
+            local default_value="${1:-}"
+            local v
+            set +e
+            v=$(az keyvault secret show --vault-name "$VAULT" --name "$name" --query value -o tsv 2>/dev/null)
+            local rc=$?
+            set -e
+            if [[ $rc -ne 0 || -z "$v" ]]; then
+              if [[ -n "$default_value" ]]; then
+                echo "$default_value"
+              else
+                echo "ERROR: Secret $name not found and no default provided" >&2
+                exit 1
+              fi
+            else
+              echo "$v"
+            fi
+          }
+          echo "REDIS_HOST=$(get conexao-de-sorte-redis-host)" >> "$GITHUB_ENV"
+          echo "REDIS_PORT=$(get conexao-de-sorte-redis-port 6379)" >> "$GITHUB_ENV"
+          echo "REDIS_PASSWORD=$(get conexao-de-sorte-redis-password '')" >> "$GITHUB_ENV"
+          echo "REDIS_DATABASE=$(get conexao-de-sorte-redis-database 1)" >> "$GITHUB_ENV"
       - name: 🧹 Clean old containers
         run: |
           echo "🧹 Cleaning old batepapo-microservice containers..."
@@ -281,13 +316,19 @@ jobs:
             --health-retries=5 \
             --health-start-period=60s \
             -e SPRING_PROFILES_ACTIVE="prod,azure" \
-            -e SERVER_PORT="8079" \
+            -e conexao-de-sorte-server-port="8079" \
             -e TZ="America/Sao_Paulo" \
             -e AZURE_CLIENT_ID='${{ secrets.AZURE_CLIENT_ID }}' \
             -e AZURE_TENANT_ID='${{ secrets.AZURE_TENANT_ID }}' \
             -e AZURE_SUBSCRIPTION_ID='${{ secrets.AZURE_SUBSCRIPTION_ID }}' \
             -e AZURE_KEYVAULT_ENDPOINT='${{ secrets.AZURE_KEYVAULT_ENDPOINT }}' \
             -e AZURE_KEYVAULT_NAME='${{ secrets.AZURE_KEYVAULT_NAME }}' \
+            -e conexao-de-sorte-redis-host="${REDIS_HOST}" \
+            -e conexao-de-sorte-redis-port="${REDIS_PORT}" \
+            -e conexao-de-sorte-redis-password="${REDIS_PASSWORD}" \
+            -e conexao-de-sorte-redis-database="${REDIS_DATABASE}" \
+            -e conexao-de-sorte-auth-service-url="http://auth-microservice:8081" \
+            -e conexao-de-sorte-jwt-jwks-uri="http://auth-microservice:8081/.well-known/jwks.json" \
             --label "traefik.enable=true" \
             --label "traefik.docker.network=conexao-network" \
             --label "traefik.http.routers.batepapo.rule=Host(\\`chat.conexaodesorte.com.br\\`)" \
