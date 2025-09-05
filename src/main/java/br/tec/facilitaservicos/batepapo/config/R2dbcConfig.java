@@ -1,13 +1,8 @@
 
 package br.tec.facilitaservicos.batepapo.config;
 
-
-import io.r2dbc.pool.ConnectionPool;
-import io.r2dbc.pool.ConnectionPoolConfiguration;
-import io.r2dbc.spi.ConnectionFactories;
-import io.r2dbc.spi.ConnectionFactory;
-import io.r2dbc.spi.ConnectionFactoryOptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.r2dbc.ConnectionFactoryBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -15,11 +10,16 @@ import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.transaction.ReactiveTransactionManager;
 
+import io.r2dbc.spi.ConnectionFactory;
 import java.time.Duration;
 
+/**
+ * Configuração R2DBC usando Spring Boot ConnectionFactoryBuilder
+ * para compatibilidade com Spring Boot 3.5.5 e options-capable ConnectionFactory
+ */
 @Configuration
 @EnableR2dbcRepositories(basePackages = "br.tec.facilitaservicos.batepapo.dominio.repositorio")
-public class R2dbcConfig  {
+public class R2dbcConfig {
 
     @Value("${spring.r2dbc.url}")
     private String url;
@@ -41,40 +41,25 @@ public class R2dbcConfig  {
     
     @Value("${spring.r2dbc.pool.max-acquire-time:60s}")
     private Duration maxAcquireTime;
-    
-    @Value("${spring.r2dbc.pool.max-create-connection-time:30s}")
-    private Duration maxCreateConnectionTime;
-    
-    @Value("${spring.r2dbc.pool.max-life-time:60m}")
-    private Duration maxLifeTime;
 
-    @Value("${spring.r2dbc.pool.validation-query:SELECT 1}")
-    private String validationQuery;
-
-    
+    /**
+     * ConnectionFactory using Spring Boot ConnectionFactoryBuilder
+     * This ensures the ConnectionFactory is options-capable for Spring Boot 3.5.5
+     */
     @Bean
     @Primary
     public ConnectionFactory connectionFactory() {
-        ConnectionFactoryOptions options = ConnectionFactoryOptions.parse(url)
-                .mutate()
-                .option(ConnectionFactoryOptions.USER, username)
-                .option(ConnectionFactoryOptions.PASSWORD, password)
+        return ConnectionFactoryBuilder.create()
+                .url(url)
+                .username(username)
+                .password(password)
+                .option("initialSize", String.valueOf(initialSize))
+                .option("maxSize", String.valueOf(maxSize))
+                .option("maxIdleTime", maxIdleTime.toString())
+                .option("maxAcquireTime", maxAcquireTime.toString())
+                .option("acquireRetry", "3")
+                .option("validationQuery", "SELECT 1")
                 .build();
-
-        ConnectionFactory connectionFactory = ConnectionFactories.get(options);
-
-        ConnectionPoolConfiguration poolConfiguration = ConnectionPoolConfiguration.builder(connectionFactory)
-                .initialSize(initialSize)
-                .maxSize(maxSize)
-                .maxIdleTime(maxIdleTime)
-                .maxAcquireTime(maxAcquireTime)
-                .maxCreateConnectionTime(maxCreateConnectionTime)
-                .maxLifeTime(maxLifeTime)
-                .validationQuery(validationQuery)
-                .acquireRetry(3)
-                .build();
-
-        return new ConnectionPool(poolConfiguration);
     }
 
     @Bean

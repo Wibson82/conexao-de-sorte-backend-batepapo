@@ -63,7 +63,7 @@ spring:
     validate-on-migrate: false
   data:
     redis:
-      host: ${conexao-de-sorte-redis-host:localhost}
+      host: ${conexao-de-sorte-redis-host:redis}
       port: ${conexao-de-sorte-redis-port:6379}
       password: ${conexao-de-sorte-redis-password:}
       database: ${conexao-de-sorte-redis-database:4}
