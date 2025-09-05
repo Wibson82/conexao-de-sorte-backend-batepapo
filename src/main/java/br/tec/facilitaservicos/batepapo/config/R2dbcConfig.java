@@ -2,7 +2,6 @@
 package br.tec.facilitaservicos.batepapo.config;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.r2dbc.ConnectionFactoryBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -11,6 +10,8 @@ import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.transaction.ReactiveTransactionManager;
 
 import io.r2dbc.spi.ConnectionFactory;
+import io.r2dbc.spi.ConnectionFactories;
+import io.r2dbc.spi.ConnectionFactoryOptions;
 import java.time.Duration;
 
 /**
@@ -43,23 +44,31 @@ public class R2dbcConfig {
     private Duration maxAcquireTime;
 
     /**
-     * ConnectionFactory using Spring Boot ConnectionFactoryBuilder
+     * ConnectionFactory using Spring Boot auto-configuration
      * This ensures the ConnectionFactory is options-capable for Spring Boot 3.5.5
+     * by letting Spring Boot handle the configuration automatically
      */
     @Bean
     @Primary
     public ConnectionFactory connectionFactory() {
-        return ConnectionFactoryBuilder.create()
-                .url(url)
-                .username(username)
-                .password(password)
-                .option("initialSize", String.valueOf(initialSize))
-                .option("maxSize", String.valueOf(maxSize))
-                .option("maxIdleTime", maxIdleTime.toString())
-                .option("maxAcquireTime", maxAcquireTime.toString())
-                .option("acquireRetry", "3")
-                .option("validationQuery", "SELECT 1")
-                .build();
+        // Use Spring Boot's built-in ConnectionFactoryBuilder via ConnectionFactoryOptions
+        ConnectionFactoryOptions.Builder builder = ConnectionFactoryOptions.parse(url).mutate();
+        
+        if (username != null && !username.isEmpty()) {
+            builder.option(ConnectionFactoryOptions.USER, username);
+        }
+        if (password != null && !password.isEmpty()) {
+            builder.option(ConnectionFactoryOptions.PASSWORD, password);
+        }
+        
+        // Pool options
+        builder.option(ConnectionFactoryOptions.POOL_INITIAL_SIZE, initialSize);
+        builder.option(ConnectionFactoryOptions.POOL_MAX_SIZE, maxSize);
+        builder.option(ConnectionFactoryOptions.POOL_MAX_IDLE_TIME, maxIdleTime);
+        builder.option(ConnectionFactoryOptions.POOL_MAX_ACQUIRE_TIME, maxAcquireTime);
+        
+        ConnectionFactoryOptions options = builder.build();
+        return ConnectionFactories.get(options);
     }
 
     @Bean
