@@ -321,3 +321,6 @@ jobs:
             curl -X POST -H 'Content-type: application/json' \
             --data "{'text':'$STATUS: Batepapo Microservice Deployment','attachments':[{'color':'$COLOR','fields':[{'title':'Branch','value':'${{ github.ref_name }}','short':true},{'title':'Commit','value':'${{ github.sha }}','short':true}]}]}" \
             $SLACK_WEBHOOK_URL
+          else
+            echo "SLACK_WEBHOOK_URL not configured, skipping notification"
+          fi

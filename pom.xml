@@ -212,12 +212,8 @@
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
 
-        <!-- Biblioteca compartilhada de entidades -->
-        <dependency>
-            <groupId>br.tec.facilitaservicos</groupId>
-            <artifactId>common-entities</artifactId>
-            <version>1.0.0</version>
-        </dependency>
+        <!-- Biblioteca compartilhada de entidades - movida para pacote interno -->
+        <!-- Removida dependência externa - classe ReactiveAuditableEntity agora está em br.tec.facilitaservicos.common.entity -->
 
         <!-- Jackson -->
         <dependency>
