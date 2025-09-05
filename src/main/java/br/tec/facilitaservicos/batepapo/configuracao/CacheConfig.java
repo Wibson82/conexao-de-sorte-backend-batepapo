@@ -1,12 +1,16 @@
 package br.tec.facilitaservicos.batepapo.configuracao;
 
-import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -14,9 +18,7 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * Configuração de cache Redis otimizada para microserviço de bate-papo.
@@ -90,7 +92,7 @@ public class CacheConfig {
     }
 
     @Bean
-    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(RedisConnectionFactory connectionFactory) {
+    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(ReactiveRedisConnectionFactory connectionFactory) {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer();
 
@@ -103,6 +105,6 @@ public class CacheConfig {
             .hashValue(valueSerializer)
             .build();
 
-        return new ReactiveRedisTemplate<String, Object>(connectionFactory, context);
+        return new ReactiveRedisTemplate<>(connectionFactory, context);
     }
 }
