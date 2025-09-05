@@ -17,6 +17,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.data.redis.stream.StreamReceiver;
+import org.springframework.data.redis.connection.stream.MapRecord;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -106,5 +108,11 @@ public class CacheConfig {
             .build();
 
         return new ReactiveRedisTemplate<>(connectionFactory, context);
+    }
+
+    @Bean
+    public StreamReceiver<String, MapRecord<String, String, String>> streamReceiver(
+            ReactiveRedisConnectionFactory connectionFactory) {
+        return StreamReceiver.create(connectionFactory);
     }
 }
