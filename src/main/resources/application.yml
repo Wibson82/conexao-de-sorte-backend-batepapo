@@ -102,6 +102,18 @@ spring:
     time-zone: America/Sao_Paulo
     locale: pt_BR
 
+# Configurações de serviços externos
+services:
+  auth:
+    url: ${conexao-de-sorte-auth-service-url:http://localhost:8081}
+    endpoints:
+      validate: /rest/v1/auth/validate
+      users: /rest/v1/users
+    timeout: 5s
+    retry:
+      max-attempts: 3
+      delay: 1s
+
 management:
   endpoints:
     web:
@@ -224,4 +236,4 @@ logging:
     "[com.azure]": WARN
     
   file:
-    name: /var/log/batepapo/application.log
+    name: ${LOG_FILE_PATH:/app/logs/batepapo.log}
