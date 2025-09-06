@@ -168,42 +168,6 @@ springdoc:
 spring:
   config:
     activate:
-      on-profile: dev
-  r2dbc:
-    url: r2dbc:mysql://localhost:3306/conexao_sorte_batepapo_dev
-  flyway:
-    url: jdbc:mysql://localhost:3306/conexao_sorte_batepapo_dev
-
-logging:
-  level:
-    "[br.tec.facilitaservicos.batepapo]": DEBUG
-    "[org.springframework.security]": DEBUG
-    "[org.springframework.r2dbc]": DEBUG
-    "[org.springframework.web.socket]": DEBUG
-
-
-
----
-# Test Profile  
-spring:
-  config:
-    activate:
-      on-profile: test
-      
-  cloud:
-    azure:
-      keyvault:
-        secret:
-          enabled: false
-
-logging:
-  level:
-    "[br.tec.facilitaservicos.batepapo]": DEBUG
-
----
-spring:
-  config:
-    activate:
       on-profile: prod
       
   # Habilitar Key Vault em produção
