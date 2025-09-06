@@ -1,13 +1,13 @@
 package br.tec.facilitaservicos.batepapo.infraestrutura.tracing;
 
-import io.micrometer.tracing.TraceContext;
-import io.micrometer.tracing.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ClientRequest;
-import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
+
+import io.micrometer.tracing.TraceContext;
+import io.micrometer.tracing.Tracer;
 import reactor.core.publisher.Mono;
 
 /**
