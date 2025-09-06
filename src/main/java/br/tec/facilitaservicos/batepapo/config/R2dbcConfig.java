@@ -61,11 +61,11 @@ public class R2dbcConfig {
             builder.option(ConnectionFactoryOptions.PASSWORD, password);
         }
         
-        // Pool options
-        builder.option(ConnectionFactoryOptions.POOL_INITIAL_SIZE, initialSize);
-        builder.option(ConnectionFactoryOptions.POOL_MAX_SIZE, maxSize);
-        builder.option(ConnectionFactoryOptions.POOL_MAX_IDLE_TIME, maxIdleTime);
-        builder.option(ConnectionFactoryOptions.POOL_MAX_ACQUIRE_TIME, maxAcquireTime);
+        // Pool options - using string literals as these constants may not exist in all R2DBC versions
+        builder.option(ConnectionFactoryOptions.of("initialSize"), initialSize);
+        builder.option(ConnectionFactoryOptions.of("maxSize"), maxSize);
+        builder.option(ConnectionFactoryOptions.of("maxIdleTime"), maxIdleTime);
+        builder.option(ConnectionFactoryOptions.of("maxAcquireTime"), maxAcquireTime);
         
         ConnectionFactoryOptions options = builder.build();
         return ConnectionFactories.get(options);
