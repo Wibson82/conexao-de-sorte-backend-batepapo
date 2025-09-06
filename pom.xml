@@ -435,6 +435,40 @@
                 </executions>
                 -->
             </plugin>
+            <!-- Maven Enforcer Plugin - políticas anti-downgrade e convergência -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <rules>
+                        <requireJavaVersion>
+                            <version>[24,)</version>
+                        </requireJavaVersion>
+                        <requireMavenVersion>
+                            <version>[3.9.0,)</version>
+                        </requireMavenVersion>
+                        <bannedDependencies>
+                            <excludes>
+                                <exclude>org.springframework.boot:spring-boot-starter-web</exclude>
+                                <exclude>org.springframework:spring-webmvc</exclude>
+                                <exclude>com.h2database:h2:*:*:compile</exclude>
+                            </excludes>
+                        </bannedDependencies>
+                        <dependencyConvergence/>
+                    </rules>
+                    <fail>true</fail>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>enforce-versions</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
