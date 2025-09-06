@@ -1,23 +1,25 @@
 package br.tec.facilitaservicos.batepapo.configuracao;
 
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.core.RedisTemplate;
+
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.Gauge;
-import org.springframework.data.redis.cache.RedisCacheManager;
-import org.springframework.data.redis.connection.RedisConnection;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisCallback;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.connection.ReturnType;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Métricas customizadas para monitoramento do cache Redis.
  * Específico para padrões de acesso do bate-papo em tempo real.
  */
 public class RedisCacheMetrics {
+
+    private static final Logger logger = LoggerFactory.getLogger(RedisCacheMetrics.class);
 
     private final RedisCacheManager cacheManager;
     private final MeterRegistry meterRegistry;
@@ -113,26 +115,19 @@ public class RedisCacheMetrics {
      */
     public void collectChatSpecificMetrics(RedisTemplate<String, Object> redisTemplate) {
         try {
-            // Contagem de chaves específicas do chat
-            Long userOnlineKeys = redisTemplate.execute((RedisCallback<Long>) connection -> 
-                connection.eval("return #redis.call('keys', ARGV[1])".getBytes(), ReturnType.INTEGER, 0, (applicationName + ":chat:usuarios-online:*").getBytes())
-            );
-            
-            Long messageKeys = redisTemplate.execute((RedisCallback<Long>) connection -> 
-                connection.eval("return #redis.call('keys', ARGV[1])".getBytes(), ReturnType.INTEGER, 0, (applicationName + ":chat:mensagens:*").getBytes())
-            );
-            
-            if (userOnlineKeys != null) {
-                updateActiveSessions(userOnlineKeys);
-            }
-            
-            if (messageKeys != null) {
-                updateMessagesInCache(messageKeys);
-            }
-            
+            // Contagem de chaves específicas do chat usando API não depreciada (keys)
+            Set<String> userOnlineKeys = redisTemplate.keys(applicationName + ":chat:usuarios-online:*");
+            Set<String> messageKeys = redisTemplate.keys(applicationName + ":chat:mensagens:*");
+
+            int userOnlineCount = (userOnlineKeys == null) ? 0 : userOnlineKeys.size();
+            int messageCount = (messageKeys == null) ? 0 : messageKeys.size();
+
+            updateActiveSessions(userOnlineCount);
+            updateMessagesInCache(messageCount);
+
         } catch (Exception e) {
             // Log do erro sem quebrar a aplicação
-            System.err.println("Erro ao coletar métricas do Redis: " + e.getMessage());
+            logger.error("Erro ao coletar métricas do Redis: {}", e.getMessage(), e);
         }
     }
 }

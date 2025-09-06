@@ -1,21 +1,21 @@
 package br.tec.facilitaservicos.batepapo.infraestrutura.cliente;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
-import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import java.time.Duration;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
 import reactor.core.publisher.Mono;
-
-import java.time.Duration;
-import java.util.Map;
 
 /**
  * Cliente para integração com o Auth Service
@@ -39,10 +39,10 @@ public class AuthServiceClient {
         this.validateEndpoint = validateEndpoint;
         this.usersEndpoint = usersEndpoint;
         this.webClient = webClientBuilder
-            .baseUrl(authBaseUrl)
+            .baseUrl(this.authBaseUrl)
             .build();
         
-        logger.info("🔐 AuthServiceClient configurado: baseUrl={} com Circuit Breaker", authBaseUrl);
+        logger.info("🔐 AuthServiceClient configurado: baseUrl={} com Circuit Breaker", this.authBaseUrl);
     }
 
     /**
@@ -58,9 +58,10 @@ public class AuthServiceClient {
             .get()
             .uri(usersEndpoint + "/{userId}/status", userId)
             .retrieve()
-            .bodyToMono(Map.class)
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .map(response -> {
-                boolean online = Boolean.parseBoolean(response.getOrDefault("online", false).toString());
+                Object onlineVal = response.get("online");
+                boolean online = onlineVal instanceof Boolean ? (Boolean) onlineVal : Boolean.parseBoolean(String.valueOf(onlineVal));
                 logger.debug("✅ Status do usuário {}: {}", userId, online ? "online" : "offline");
                 return online;
             })
@@ -102,9 +103,10 @@ public class AuthServiceClient {
             .uri(validateEndpoint)
             .header("Authorization", "Bearer " + token)
             .retrieve()
-            .bodyToMono(Map.class)
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .map(response -> {
-                boolean valid = Boolean.parseBoolean(response.getOrDefault("valid", false).toString());
+                Object validVal = response.get("valid");
+                boolean valid = validVal instanceof Boolean ? (Boolean) validVal : Boolean.parseBoolean(String.valueOf(validVal));
                 logger.debug("✅ Token válido: {}", valid);
                 return valid;
             })
@@ -128,15 +130,14 @@ public class AuthServiceClient {
     @CircuitBreaker(name = "auth-service", fallbackMethod = "fallbackGetUserInfo")
     @Retry(name = "auth-service")
     @TimeLimiter(name = "auth-service")
-    @SuppressWarnings("unchecked")
-    public Mono<Map> getUserInfo(Long userId) {
+    public Mono<Map<String, Object>> getUserInfo(Long userId) {
         logger.debug("👤 Obtendo informações do usuário: userId={}", userId);
 
         return webClient
             .get()
             .uri(usersEndpoint + "/{userId}", userId)
             .retrieve()
-            .bodyToMono(Map.class)
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .timeout(Duration.ofSeconds(5))
             .onErrorResume(WebClientResponseException.class, ex -> {
                 if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
@@ -152,7 +153,7 @@ public class AuthServiceClient {
                 return Mono.just(Map.of("id", userId, "active", false));
             })
             .onErrorReturn(Map.of("id", userId, "active", false))
-            .doOnSuccess(user -> logger.debug("✅ Info do usuário obtida: userId={}", userId));
+            .doOnSuccess(v -> logger.debug("✅ Info do usuário obtida: userId={}", userId));
     }
 
     /**
@@ -163,8 +164,8 @@ public class AuthServiceClient {
             .get()
             .uri("/actuator/health")
             .retrieve()
-            .bodyToMono(Map.class)
-            .map(response -> "UP".equals(response.get("status")))
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+            .map(response -> "UP".equals(String.valueOf(response.get("status"))))
             .timeout(Duration.ofSeconds(2))
             .onErrorReturn(false)
             .doOnSuccess(healthy -> {
@@ -188,8 +189,7 @@ public class AuthServiceClient {
         return Mono.just(false); // Token inválido em caso de falha
     }
     
-    @SuppressWarnings("unchecked")
-    public Mono<Map> fallbackGetUserInfo(Long userId, Exception ex) {
+    public Mono<Map<String, Object>> fallbackGetUserInfo(Long userId, Exception ex) {
         logger.warn("🔴 Fallback getUserInfo para usuário {}: {}", userId, ex.getMessage());
         return Mono.just(Map.of(
             "id", userId,
