@@ -61,11 +61,8 @@ public class R2dbcConfig {
             builder.option(ConnectionFactoryOptions.PASSWORD, password);
         }
         
-        // Pool options - using string literals as these constants may not exist in all R2DBC versions
-        builder.option(ConnectionFactoryOptions.of("initialSize"), initialSize);
-        builder.option(ConnectionFactoryOptions.of("maxSize"), maxSize);
-        builder.option(ConnectionFactoryOptions.of("maxIdleTime"), maxIdleTime);
-        builder.option(ConnectionFactoryOptions.of("maxAcquireTime"), maxAcquireTime);
+        // Pool options removed - using Spring Boot's auto-configuration for pool settings
+        // Pool will be configured via application.yml properties instead
         
         ConnectionFactoryOptions options = builder.build();
         return ConnectionFactories.get(options);
