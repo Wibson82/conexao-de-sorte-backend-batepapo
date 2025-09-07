@@ -120,7 +120,7 @@ jobs:
 
   build-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     name: 🐳 Build Docker Image
     needs: build-and-test
     permissions:
@@ -204,6 +204,7 @@ jobs:
             org.opencontainers.image.service=${{ env.SERVICE_NAME }}
       - name: Build and push image
         id: build
+        timeout-minutes: 30
         uses: docker/build-push-action@v5
         with:
           context: .
