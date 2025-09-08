@@ -50,6 +50,12 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Force MSAL4J version to resolve convergence -->
+            <dependency>
+                <groupId>com.microsoft.azure</groupId>
+                <artifactId>msal4j</artifactId>
+                <version>1.21.0</version>
+            </dependency>
             <!-- Azure BOMs -->
             <dependency>
                 <groupId>com.azure</groupId>
