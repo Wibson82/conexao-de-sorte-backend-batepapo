@@ -1,5 +1,5 @@
 server:
-  port: ${conexao-de-sorte-server-port:8079}
+  port: ${conexao-de-sorte-server-port:8094}  # Porta específica Bate-papo
   shutdown: graceful
   ssl:
     enabled: ${conexao-de-sorte-ssl-enabled:false}
@@ -15,31 +15,37 @@ server:
     include-exception: false
 
 spring:
+  config:
+    import: optional:configtree:/run/secrets/
   application:
-    name: batepapo
+    name: conexao-batepapo
   profiles:
     default: prod
-    active: prod
   main:
     allow-bean-definition-overriding: true
     
-  # Azure Key Vault with manual configuration (matching Auth Service)
+  # Azure Key Vault (configuração base)
   cloud:
     azure:
       keyvault:
         secret:
-          enabled: ${AZURE_KEYVAULT_ENABLED:true}
-          endpoint: ${AZURE_KEYVAULT_ENDPOINT:}
-      profile:
-        tenant-id: ${AZURE_TENANT_ID:}
-        subscription-id: ${AZURE_SUBSCRIPTION_ID:}
-        client-id: ${AZURE_CLIENT_ID:}
-        
-  config:
-    import:
-      - optional:configtree:/etc/secrets/azure/
-      - optional:configtree:/mnt/secrets/
-      - optional:file:./secrets.properties
+          enabled: ${AZURE_KEYVAULT_ENABLED:false}
+
+  # Redis para cache (Bate-papo usa DB 4)
+  data:
+    redis:
+      host: ${conexao-de-sorte-redis-host:conexao-redis}
+      port: ${conexao-de-sorte-redis-port:6379}
+      password: ${conexao-de-sorte-redis-password:senha_teste}
+      database: ${conexao-de-sorte-redis-database:4}  # Bate-papo = DB 4
+      timeout: 2000ms
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 15  # Chat precisa de mais conexões
+          max-idle: 8
+          min-idle: 3
+          max-wait: 3000ms
   r2dbc:
     # Preferencialmente usa -database-r2dbc-url; mantém compat com -database-url
     url: ${conexao-de-sorte-database-r2dbc-url:${conexao-de-sorte-database-url:r2dbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}}
@@ -58,15 +64,15 @@ spring:
     # Padroniza uso de -database-jdbc-url, mantendo compatibilidade com -database-flyway-url
     url: ${conexao-de-sorte-database-jdbc-url:${conexao-de-sorte-database-flyway-url:jdbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}}
     user: ${conexao-de-sorte-database-username:}
-    password: ${conexao-de-sorte-database-password:}
+    password: ${conexao-de-sorte-redis-password:senha_teste}
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
   data:
     redis:
-      host: ${conexao-de-sorte-redis-host:redis}
+      host: ${conexao-de-sorte-redis-host:conexao-redis}
       port: ${conexao-de-sorte-redis-port:6379}
-      password: ${conexao-de-sorte-redis-password:}
+      password: ${conexao-de-sorte-redis-password:senha_teste}
       database: ${conexao-de-sorte-redis-database:4}
       timeout: 3000ms
       connect-timeout: 10000ms
@@ -99,7 +105,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8081/.well-known/jwks.json}
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost: ${conexao-de-sorte-redis-host:conexao-redis}
           issuer-uri: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
   jackson:
     time-zone: America/Sao_Paulo
@@ -108,7 +114,7 @@ spring:
 # Configurações de serviços externos
 services:
   auth:
-    url: ${conexao-de-sorte-auth-service-url:http://localhost:8081}
+    url: ${conexao-de-sorte-auth-service-url:http://localhost: ${conexao-de-sorte-redis-host:conexao-redis}
     endpoints:
       validate: /rest/v1/auth/validate
       users: /rest/v1/users
@@ -152,7 +158,7 @@ management:
       probability: ${TRACING_PROBABILITY:0.1}
   otlp:
     tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost: ${conexao-de-sorte-redis-host:conexao-redis}
 
 springdoc:
   api-docs:
