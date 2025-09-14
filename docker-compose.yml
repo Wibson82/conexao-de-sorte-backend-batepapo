@@ -2,13 +2,10 @@
 # 🐳 DOCKER COMPOSE - AMBIENTE COMPLETO BATE-PAPO
 # ============================================================================
 # 
-# Orquestração completa do microserviço bate-papo:
-# - MySQL 8.0 com R2DBC
-# - Redis para cache e streams distribuídos
-# - Prometheus para métricas
-# - Grafana para dashboards
-# - Volumes persistentes
-# - Rede isolada
+# Microserviço bate-papo conectado ao infraestrutura-core:
+# - MySQL 8.0 local com R2DBC
+# - Redis do infraestrutura-core para cache e streams
+# - Rede conexao-network-swarm
 # 
 # Uso: docker-compose up -d
 # ============================================================================
@@ -34,10 +31,10 @@ services:
       - conexao-de-sorte-database-username=batepapo_user
       - conexao-de-sorte-database-password=batepapo_pass123!
       
-      # Redis
-      - conexao-de-sorte-redis-host=batepapo-redis
+      # Redis - Infraestrutura Core
+      - conexao-de-sorte-redis-host=conexao-redis
       - conexao-de-sorte-redis-port=6379
-      - conexao-de-sorte-redis-password=redis_pass123!
+      - conexao-de-sorte-redis-password=${REDIS_PASSWORD}
       - conexao-de-sorte-redis-database=2
       
       # JWT
@@ -75,7 +72,6 @@ services:
       - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
     depends_on:
       - batepapo-mysql
-      - batepapo-redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8079/actuator/health"]
       interval: 30s
@@ -83,12 +79,12 @@ services:
       retries: 5
       start_period: 60s
     networks:
-      - batepapo-network
+      - conexao-network
     volumes:
       - ./logs:/app/logs
 
   # ========================================
-  # 🗄️ MYSQL DATABASE
+  # 🗄️ MYSQL DATABASE (LOCAL)
   # ========================================
   batepapo-mysql:
     image: mysql:8.0
@@ -115,85 +111,11 @@ services:
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d/migrations:ro
     networks:
-      - batepapo-network
+      - conexao-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
-
-  # ========================================
-  # 🚀 REDIS CACHE & STREAMS
-  # ========================================
-  batepapo-redis:
-    image: redis:7-alpine
-    container_name: batepapo-redis
-    restart: unless-stopped
-    ports:
-      - "6381:6379"  # Porta diferente para evitar conflito
-    environment:
-      - REDIS_PASSWORD=redis_pass123!
-    command: >
-      redis-server 
-      --requirepass redis_pass123!
-      --maxmemory 1gb
-      --maxmemory-policy allkeys-lru
-      --tcp-keepalive 60
-      --timeout 300
-    volumes:
-      - batepapo-redis-data:/data
-      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    networks:
-      - batepapo-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_pass123!", "ping"]
-      timeout: 20s
-      retries: 5
-
-  # ========================================
-  # 📈 PROMETHEUS (Métricas)
-  # ========================================
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: batepapo-prometheus
-    restart: unless-stopped
-    ports:
-      - "9092:9090"  # Porta diferente para evitar conflito
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    networks:
-      - batepapo-network
-    depends_on:
-      - batepapo-service
-
-  # ========================================
-  # 📊 GRAFANA (Dashboards)
-  # ========================================
-  grafana:
-    image: grafana/grafana:latest
-    container_name: batepapo-grafana
-    restart: unless-stopped
-    ports:
-      - "3002:3000"  # Porta diferente para evitar conflito
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin123!
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=redis-datasource
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - batepapo-network
-    depends_on:
-      - prometheus
 
 # ========================================
 # 💾 VOLUMES PERSISTENTES
@@ -201,19 +123,11 @@ services:
 volumes:
   batepapo-mysql-data:
     driver: local
-  batepapo-redis-data:
-    driver: local
-  prometheus-data:
-    driver: local
-  grafana-data:
-    driver: local
 
 # ========================================
-# 🌐 REDE ISOLADA
+# 🌐 REDE EXTERNA
 # ========================================
 networks:
-  batepapo-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.26.0.0/16
+  conexao-network:
+    name: conexao-network-swarm
+    external: true
