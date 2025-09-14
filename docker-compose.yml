@@ -25,10 +25,10 @@ services:
     ports:
       - "8079:8079"
     environment:
-      # Database
-      - conexao-de-sorte-database-r2dbc-url=r2dbc:mysql://batepapo-mysql:3306/conexao_sorte_batepapo
-      - conexao-de-sorte-database-username=batepapo_user
-      - conexao-de-sorte-database-password=batepapo_pass123!
+      # Database (infraestrutura centralizada)
+      - conexao-de-sorte-database-r2dbc-url=r2dbc:mysql://conexao-mysql:3306/conexao_chat
+      - conexao-de-sorte-database-username=${DATABASE_USERNAME}
+      - conexao-de-sorte-database-password=${DATABASE_PASSWORD}
       
       # Redis - Infraestrutura Core
       - conexao-de-sorte-redis-host=conexao-redis
@@ -69,8 +69,6 @@ services:
       
       # Performance
       - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
-    depends_on:
-      - batepapo-mysql
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8079/actuator/health"]
       interval: 30s
@@ -83,45 +81,16 @@ services:
       - ./logs:/app/logs
 
   # ========================================
-  # 🗄️ MYSQL DATABASE (LOCAL)
+  # 🗄️ OBSERVAÇÃO: MySQL removido - usa infraestrutura centralizada
   # ========================================
-  batepapo-mysql:
-    image: mysql:8.0
-    container_name: batepapo-mysql
-    restart: unless-stopped
-    ports:
-      - "3308:3306"  # Porta diferente para evitar conflito
-    environment:
-      - MYSQL_ROOT_PASSWORD=root_pass123!
-      - MYSQL_DATABASE=conexao_sorte_batepapo
-      - MYSQL_USER=batepapo_user
-      - MYSQL_PASSWORD=batepapo_pass123!
-      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
-      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
-    command: >
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --default-authentication-plugin=mysql_native_password
-      --innodb-buffer-pool-size=1G
-      --innodb-log-file-size=256M
-      --max-connections=200
-    volumes:
-      - batepapo-mysql-data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d/migrations:ro
-    networks:
-      - conexao-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
+  # MySQL agora fornecido pelo conexao-de-sorte-infraestrutura-core
+  # Database: conexao_chat no servidor conexao-mysql
 
 # ========================================
 # 💾 VOLUMES PERSISTENTES
 # ========================================
+# Volumes do MySQL removidos - usa infraestrutura compartilhada
 volumes:
-  batepapo-mysql-data:
-    driver: local
 
 # ========================================
 # 🌐 REDE EXTERNA
