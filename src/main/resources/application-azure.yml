@@ -1,0 +1,284 @@
+# ============================================================================
+# 📢 CONFIGURAÇÃO MICROSERVIÇO BATE-PAPO - APPLICATION-AZURE.YML
+# ============================================================================
+#
+# Configuração específica para Azure Cloud com OIDC e Key Vault
+# - Azure Key Vault integration com workload identity
+# - OIDC authentication sem Client Secret
+# - Configurações de produção otimizadas
+# - Observabilidade integrada
+#
+# Perfil: azure (usado em produção no Azure)
+#
+# @author Sistema de Migração R2DBC
+# @version 1.0
+# @since 2024
+# ============================================================================
+
+spring:
+  config:
+    activate:
+      on-profile: azure
+
+  # ========================================
+  # 🔐 AZURE KEY VAULT CONFIGURATION
+  # ========================================
+  cloud:
+    azure:
+      keyvault:
+        secret:
+          enabled: true
+          endpoint: ${AZURE_KEYVAULT_ENDPOINT}
+          case-sensitive: false
+          secret-keys: >
+            conexao-de-sorte-database-r2dbc-url,
+            conexao-de-sorte-database-jdbc-url,
+            conexao-de-sorte-database-username,
+            conexao-de-sorte-database-password,
+            conexao-de-sorte-redis-password,
+            conexao-de-sorte-jwt-jwks-uri,
+            conexao-de-sorte-jwt-issuer,
+            conexao-de-sorte-cors-allowed-origins
+      profile:
+        tenant-id: ${AZURE_TENANT_ID}
+        subscription-id: ${AZURE_SUBSCRIPTION_ID}
+        # client-id configurado via workload identity
+
+  # ========================================
+  # 🗄️ DATABASE CONFIGURATION
+  # ========================================
+  r2dbc:
+    url: ${conexao-de-sorte-database-r2dbc-url}
+    username: ${conexao-de-sorte-database-username}
+    password: ${conexao-de-sorte-database-password}
+    pool:
+      initial-size: 5
+      max-size: 25
+      max-idle-time: 15m
+      max-acquire-time: 10s
+      max-create-connection-time: 8s
+      max-life-time: 30m
+      validation-query: SELECT 1
+
+  flyway:
+    enabled: true
+    url: ${conexao-de-sorte-database-jdbc-url}
+    user: ${conexao-de-sorte-database-username}
+    password: ${conexao-de-sorte-database-password}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    clean-disabled: true
+
+  # ========================================
+  # 💾 REDIS CONFIGURATION
+  # ========================================
+  data:
+    redis:
+      host: ${conexao-de-sorte-redis-host:conexao-redis}
+      port: ${conexao-de-sorte-redis-port:6379}
+      password: ${conexao-de-sorte-redis-password}
+      database: 6  # Chat = DB 6 (conforme padronização)
+      timeout: 2000ms
+      connect-timeout: 8000ms
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 20
+          max-idle: 8
+          min-idle: 4
+          max-wait: 2000ms
+          time-between-eviction-runs: 45000ms
+        cluster:
+          refresh:
+            adaptive: true
+            period: 45s
+        shutdown-timeout: 100ms
+      client-type: lettuce
+
+  # ========================================
+  # 🔐 SECURITY CONFIGURATION
+  # ========================================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri}
+          issuer-uri: ${conexao-de-sorte-jwt-issuer}
+          cache-duration: PT15M
+
+# ========================================
+# 🌐 SERVER CONFIGURATION
+# ========================================
+server:
+  port: ${conexao-de-sorte-server-port:8079}
+  shutdown: graceful
+  ssl:
+    enabled: false  # TLS termination no Traefik
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+  netty:
+    connection-timeout: 15s
+    idle-timeout: 45s
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain,text/css,application/javascript
+    min-response-size: 1024
+  forward-headers-strategy: native
+
+# ========================================
+# 📊 MANAGEMENT & OBSERVABILITY
+# ========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+      cors:
+        allowed-origins: ${conexao-de-sorte-cors-allowed-origins}
+        allowed-methods: GET,POST,PUT,DELETE,OPTIONS,HEAD
+    jmx:
+      exposure:
+        include: health,metrics,prometheus,info
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+      probes:
+        enabled: true
+    prometheus:
+      access: unrestricted
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+        step: 30s
+  observations:
+    http:
+      server:
+        requests:
+          name: http.server.requests
+  metrics:
+    distribution:
+      percentiles-histogram:
+        '[http.server.requests]': true
+      slo:
+        '[http.server.requests]': 50ms,100ms,200ms,500ms,1s,2s
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${TRACING_PROBABILITY:0.1}
+
+# ========================================
+# 📝 LOGGING CONFIGURATION
+# ========================================
+logging:
+  level:
+    root: INFO
+    '[br.tec.facilitaservicos.batepapo]': INFO
+    '[org.springframework.data.r2dbc]': INFO
+    '[org.springframework.security]': INFO
+    '[org.springframework.cache]': INFO
+    '[reactor.netty]': WARN
+    '[com.azure]': WARN
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr([%t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"
+  file:
+    name: ${LOG_FILE:/app/logs/batepapo.log}
+    max-size: ${LOG_FILE_MAX_SIZE:50MB}
+    max-history: ${LOG_FILE_MAX_HISTORY:7}
+
+# ========================================
+# 🔧 CACHE CONFIGURATION
+# ========================================
+spring:
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000ms  # 5 minutos para chat
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "chat:"
+    cache-names:
+      - chat:mensagens
+      - chat:salas
+      - chat:usuarios-online
+      - chat:mensagens-recentes
+      - chat:salas-ativas
+
+# ========================================
+# 🌐 CORS CONFIGURATION
+# ========================================
+app:
+  cors:
+    allowed-origins: ${conexao-de-sorte-cors-allowed-origins}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS,HEAD
+    allowed-headers: "*"
+    allow-credentials: ${conexao-de-sorte-cors-allow-credentials:true}
+    max-age: 3600
+
+# ========================================
+# 🔌 EXTERNAL SERVICES
+# ========================================
+services:
+  auth:
+    url: ${conexao-de-sorte-auth-service-url:http://autenticacao-service:8081}
+    endpoints:
+      validate: /rest/v1/auth/validate
+      users: /rest/v1/users
+    timeout: 5s
+    retry:
+      max-attempts: 3
+      delay: 1s
+
+# ========================================
+# 🛡️ RESILIENCE4J CONFIGURATION
+# ========================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      database:
+        sliding-window-size: 100
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+      redis:
+        sliding-window-size: 50
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 15s
+      auth-service:
+        sliding-window-size: 30
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 70
+        wait-duration-in-open-state: 30s
+  ratelimiter:
+    instances:
+      chat-service:
+        limit-for-period: 100
+        limit-refresh-period: 1m
+        timeout-duration: 3s
+
+# ========================================
+# 📊 OPENAPI DOCUMENTATION
+# ========================================
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: false  # Desabilitado em produção Azure
+    path: /swagger-ui.html
+  show-actuator: false

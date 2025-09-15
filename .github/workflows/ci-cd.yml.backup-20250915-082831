@@ -1,0 +1,447 @@
+name: "💬 Bate-papo – CI/CD Pipeline"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Destino do deploy"
+        required: false
+        default: "production"
+        type: choice
+        options: [ staging, production ]
+
+# ----------------------------------------------------------------------
+# PARÂMETROS GERAIS
+# ----------------------------------------------------------------------
+
+env:
+  SERVICE_NAME: batepapo
+  TZ: America/Sao_Paulo
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+# ----------------------------------------------------------------------
+# JOB 1 ▸ VALIDAÇÃO DO WORKSPACE
+# ----------------------------------------------------------------------
+
+jobs:
+  validate-environment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Guard: validar configurações obrigatórias do Microserviço"
+        shell: bash
+        run: |
+          chmod +x .github/workflows/scripts/validate-required-files.sh
+          ./.github/workflows/scripts/validate-required-files.sh microservice
+
+      - name: "Guard: proibir r2dbc:h2 fora de testes"
+        shell: bash
+        run: |
+          set -euo pipefail
+          FOUND=$(grep -R --line-number --include='*.yml' --include='*.yaml' --include='*.properties' "r2dbc:h2" src || true)
+          if echo "$FOUND" | grep -v "src/test/" | grep -q "r2dbc:h2"; then
+            echo "❌ r2dbc:h2 encontrado fora de src/test" >&2
+            echo "$FOUND" >&2
+            exit 1
+          fi
+
+      - name: "Guard: dependência H2 não‑test"
+        shell: bash
+        run: |
+          ./mvnw -q dependency:list -DincludeScope=compile -DoutputFile=deps.txt
+          if grep -E "com.h2database:h2|io.r2dbc:r2dbc-h2" deps.txt; then
+            echo "❌ H2 presente em scope de produção" >&2
+            exit 1
+          fi
+
+# ----------------------------------------------------------------------
+# JOB 2 ▸ BUILD + TEST + SAST/SCA
+# ----------------------------------------------------------------------
+
+  build-test-scan:
+    needs: validate-environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 24 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "24"
+          cache: maven
+
+      - name: Build + Test + Package
+        run: ./mvnw package
+
+      - name: Upload JAR artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: batepapo-jar
+          path: target/*.jar
+          retention-days: 1
+
+# ----------------------------------------------------------------------
+# JOB 3 ▸ BUILD DA IMAGEM + PUSH GHCR
+# ----------------------------------------------------------------------
+
+  build-image:
+    needs: [ build-test-scan, security-analysis ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    permissions:
+      packages: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download JAR artefact
+        uses: actions/download-artifact@v4
+        with:
+          name: batepapo-jar
+          path: target
+
+      # ─── OIDC login no Azure para acessar Key Vault ───────────────────
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: false
+
+      - name: Extrair secrets batepapo (Key Vault) ▶ arquivos temporários
+        id: secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VAULT_ENDPOINT="${{ secrets.AZURE_KEYVAULT_ENDPOINT }}"
+          if [[ "$VAULT_ENDPOINT" =~ https://([^.]+)\.vault\.azure\.net ]]; then
+            VAULT="${BASH_REMATCH[1]}"
+          else
+            echo "ERROR: Invalid AZURE_KEYVAULT_ENDPOINT format: $VAULT_ENDPOINT" >&2
+            exit 1
+          fi
+          
+          echo "Loading secrets from Azure Key Vault: $VAULT" >&2
+          
+          # Bate-papo secrets
+          REDIS_PASS=$(az keyvault secret show --vault-name "$VAULT" --name conexao-de-sorte-redis-password --query value -o tsv 2>/dev/null)
+          JWT_SECRET=$(az keyvault secret show --vault-name "$VAULT" --name conexao-de-sorte-jwt-secret --query value -o tsv 2>/dev/null)
+          
+          # Validar secrets obrigatórios
+          if [ -z "$REDIS_PASS" ] || [ -z "$JWT_SECRET" ]; then
+            echo "ERROR: Required Bate-papo secrets not found in Azure Key Vault $VAULT" >&2
+            exit 1
+          fi
+          
+          # Mascarar secrets nos logs
+          echo "::add-mask::$REDIS_PASS"
+          echo "::add-mask::$JWT_SECRET"
+          
+          # Salvar em arquivos temporários
+          printf "%s" "$REDIS_PASS" > redis_pass.txt
+          printf "%s" "$JWT_SECRET" > jwt_secret.txt
+
+      # ─── Login no GHCR ────────────────────────────────────────────────
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push Bate-papo
+        id: build
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          TIMESTAMP=$(date +'%d-%m-%Y-%H-%M')
+          IMAGE=ghcr.io/$REPO_LOWER/conexao-de-sorte-backend-batepapo:${TIMESTAMP}
+          
+          # Build com secrets
+          docker buildx build \
+            --tag "$IMAGE" \
+            --push \
+            --provenance=true \
+            --sbom=true \
+            --secret id=redis_password,src=redis_pass.txt \
+            --secret id=jwt_secret,src=jwt_secret.txt \
+            --file Dockerfile .
+          
+          # Limpar arquivos de secrets
+          rm -f redis_pass.txt jwt_secret.txt
+          
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+# ----------------------------------------------------------------------
+# JOB 3.5 ▸ ANÁLISE DE SEGURANÇA (similar aos demais serviços)
+# ----------------------------------------------------------------------
+
+  security-analysis:
+    needs: build-test-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar score de segurança do Microserviço
+        run: |
+          chmod +x .github/workflows/scripts/security-analysis.sh
+          ./.github/workflows/scripts/security-analysis.sh microservice 4
+
+# ----------------------------------------------------------------------
+# JOB 4 ▸ DEPLOY SELF‑HOSTED (Docker Swarm + secrets)
+# ----------------------------------------------------------------------
+
+  deploy-selfhosted:
+    needs: build-image
+    runs-on: [ self-hosted, Linux, X64, conexao, conexao-de-sorte-backend-batepapo ]
+    timeout-minutes: 8
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Login GHCR (Self-hosted)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull imagem do GHCR
+        run: docker pull "${{ needs.build-image.outputs.image }}"
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: false
+
+      - name: Carregar todos os segredos do Azure Key Vault
+        shell: bash
+        run: |
+          set -euo pipefail
+          VAULT_ENDPOINT="${{ secrets.AZURE_KEYVAULT_ENDPOINT }}"
+          if [[ "$VAULT_ENDPOINT" =~ https://([^.]+)\.vault\.azure\.net ]]; then
+            VAULT="${BASH_REMATCH[1]}"
+          else
+            echo "ERROR: Invalid AZURE_KEYVAULT_ENDPOINT format: $VAULT_ENDPOINT" >&2
+            exit 1
+          fi
+          
+          echo "🔐 Loading all secrets from Azure Key Vault: $VAULT" >&2
+          
+          # Função para obter secret com fallback gracioso
+          get_secret() {
+            local secret_name="$1"
+            local fallback_value="$2"
+            local secret_value
+            
+            secret_value=$(az keyvault secret show --vault-name "$VAULT" --name "$secret_name" --query value -o tsv 2>/dev/null || echo "")
+            if [ -z "$secret_value" ]; then
+              if [ -n "$fallback_value" ]; then
+                echo "⚠️ Secret $secret_name not found, using fallback" >&2
+                echo "$fallback_value"
+              else
+                echo "❌ Secret $secret_name not found and no fallback provided" >&2
+                return 1
+              fi
+            else
+              echo "✅ Secret $secret_name loaded successfully" >&2
+              echo "$secret_value"
+            fi
+          }
+          
+          # Carregar segredos com fallbacks seguros
+          REDIS_HOST=$(get_secret "conexao-de-sorte-redis-host" "localhost")
+          REDIS_PORT=$(get_secret "conexao-de-sorte-redis-port" "6379")
+          REDIS_PASSWORD=$(get_secret "conexao-de-sorte-redis-password" "")
+          REDIS_DATABASE=$(get_secret "conexao-de-sorte-redis-database" "4")
+          
+          JWT_SECRET=$(get_secret "conexao-de-sorte-jwt-secret" "")
+          JWT_ISSUER=$(get_secret "conexao-de-sorte-jwt-issuer" "https://conexaodesorte.com.br")
+          
+          CORS_ALLOWED_ORIGINS=$(get_secret "conexao-de-sorte-cors-allowed-origins" "https://conexaodesorte.com.br")
+          CORS_ALLOW_CREDENTIALS=$(get_secret "conexao-de-sorte-cors-allow-credentials" "false")
+          
+          # Criar Docker secrets (remove existing if needed)
+          printf "%s" "$REDIS_PASSWORD" | docker secret create batepapo_redis_password - 2>/dev/null || {
+            echo "⚠️ Secret batepapo_redis_password já existe, removendo e recriando..."
+            docker secret rm batepapo_redis_password 2>/dev/null || true
+            sleep 1
+            printf "%s" "$REDIS_PASSWORD" | docker secret create batepapo_redis_password -
+          }
+          printf "%s" "$JWT_SECRET" | docker secret create batepapo_jwt_secret - 2>/dev/null || {
+            echo "⚠️ Secret batepapo_jwt_secret já existe, removendo e recriando..."
+            docker secret rm batepapo_jwt_secret 2>/dev/null || true
+            sleep 1
+            printf "%s" "$JWT_SECRET" | docker secret create batepapo_jwt_secret -
+          }
+          
+          # Salvar variáveis de ambiente para o próximo step
+          echo "REDIS_HOST=$REDIS_HOST" >> $GITHUB_ENV
+          echo "REDIS_PORT=$REDIS_PORT" >> $GITHUB_ENV
+          echo "REDIS_DATABASE=$REDIS_DATABASE" >> $GITHUB_ENV
+          echo "JWT_ISSUER=$JWT_ISSUER" >> $GITHUB_ENV
+          echo "CORS_ALLOWED_ORIGINS=$CORS_ALLOWED_ORIGINS" >> $GITHUB_ENV
+          echo "CORS_ALLOW_CREDENTIALS=$CORS_ALLOW_CREDENTIALS" >> $GITHUB_ENV
+
+      - name: 🚀 Deploy to Docker Swarm
+        run: |
+          IMAGE="${{ needs.build-image.outputs.image }}"
+          SERVICE_NAME="conexao-batepapo_batepapo"
+
+          # Garantir que a rede swarm exista
+          if ! docker network ls | awk '{print $2}' | grep -qx "conexao-network-swarm"; then
+            echo "🔗 Criando rede Docker attachable: conexao-network-swarm"
+            docker network create --driver overlay --attachable "conexao-network-swarm"
+          fi
+
+          echo "🔍 Verificando se serviço $SERVICE_NAME já existe..."
+          if docker service ls --format '{{.Name}}' | grep -qx "$SERVICE_NAME"; then
+            echo "🔄 Serviço já existe - executando UPDATE para nova imagem"
+            timeout 60s docker service update \
+              --image "$IMAGE" \
+              --detach=false \
+              --update-parallelism 1 \
+              --update-delay 10s \
+              "$SERVICE_NAME"
+          else
+            echo "🆕 Serviço não existe - executando CREATE"
+            timeout 120s docker service create \
+              --name "$SERVICE_NAME" \
+              --image "$IMAGE" \
+              --network "conexao-network-swarm" \
+              --publish 8094:8080 \
+              --replicas 1 \
+              --secret "batepapo_redis_password" \
+              --secret "batepapo_jwt_secret" \
+              --env "SPRING_PROFILES_ACTIVE=prod,azure" \
+              --env "TZ=America/Sao_Paulo" \
+              --env "SERVER_PORT=8080" \
+              --env "SPRING_DATA_REDIS_HOST=${{ env.REDIS_HOST }}" \
+              --env "SPRING_DATA_REDIS_PORT=${{ env.REDIS_PORT }}" \
+              --env "SPRING_DATA_REDIS_DATABASE=${{ env.REDIS_DATABASE }}" \
+              --env "JWT_ISSUER=${{ env.JWT_ISSUER }}" \
+              --env "CORS_ALLOWED_ORIGINS=${{ env.CORS_ALLOWED_ORIGINS }}" \
+              --env "CORS_ALLOW_CREDENTIALS=${{ env.CORS_ALLOW_CREDENTIALS }}" \
+              --env "AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}" \
+              --env "AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}" \
+              --env "AZURE_KEYVAULT_ENDPOINT=${{ secrets.AZURE_KEYVAULT_ENDPOINT }}" \
+              --env "AZURE_KEYVAULT_ENABLED=true" \
+              --restart-condition "any" \
+              --restart-delay "30s" \
+              --restart-max-attempts "2" \
+              --restart-window "120s" \
+              --health-cmd 'curl -f http://localhost:8080/actuator/health' \
+              --health-interval "30s" \
+              --health-timeout "10s" \
+              --health-retries "3" \
+              --health-start-period "60s" \
+              --label "traefik.enable=true" \
+              --label "traefik.docker.network=conexao-network-swarm" \
+              --label "traefik.http.routers.batepapo.rule=Host(\`batepapo.conexaodesorte.com.br\`)" \
+              --label "traefik.http.routers.batepapo.entrypoints=websecure" \
+              --label "traefik.http.routers.batepapo.tls.certresolver=letsencrypt" \
+              --label "traefik.http.services.batepapo.loadbalancer.server.port=8080" \
+              --detach=false
+          fi
+
+          # Verificar se deploy foi bem-sucedido com health check robusto
+          set -euo pipefail
+          INTERNAL_PORT=8080
+          MAX_ATTEMPTS=20
+          INTERVAL=10
+
+          echo "🔍 Verificando saúde do serviço $SERVICE_NAME..."
+
+          # Função para checar o endpoint de saúde
+          check_health() {
+              container_id=$(docker ps -q --filter "label=com.docker.swarm.service.name=${SERVICE_NAME}" | head -n 1)
+              if [[ -n "$container_id" ]]; then
+                  echo "📋 Container ID encontrado: $container_id"
+                  echo "🩺 Testando endpoint de saúde em http://localhost:${INTERNAL_PORT}/actuator/health"
+                  if docker exec "$container_id" sh -c "command -v curl >/dev/null && curl -sf http://localhost:${INTERNAL_PORT}/actuator/health || wget -qO- http://localhost:${INTERNAL_PORT}/actuator/health" | grep -q "UP"; then
+                      return 0 # Success
+                  else
+                      echo "⏳ Health endpoint ainda não está UP..."
+                      return 1 # Failure
+                  fi
+              else
+                  echo "⚠️ Container para o serviço $SERVICE_NAME ainda não encontrado."
+                  return 1 # Failure
+              fi
+          }
+
+          # Loop de verificação
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+              echo "⏳ Verificação de saúde $i/$MAX_ATTEMPTS..."
+              
+              replicas=$(docker service ls --filter name="$SERVICE_NAME" --format '{{.Replicas}}')
+              if [[ "$replicas" == "1/1" ]]; then
+                  echo "✅ Serviço $SERVICE_NAME tem 1/1 réplicas em execução."
+                  if check_health; then
+                      echo "✅ Serviço está saudável e respondendo!"
+                      echo "🎉 Deploy validado com sucesso!"
+                      exit 0
+                  fi
+              elif [[ "$replicas" == "0/1" ]]; then
+                   echo "❌ Serviço $SERVICE_NAME está com 0/1 réplicas. Verificando logs..."
+                   docker service logs "$SERVICE_NAME" --tail 50
+                   exit 1
+              else
+                  echo "⏳ Serviço $SERVICE_NAME ainda não está com 1/1 réplicas. Status: $replicas"
+              fi
+              
+              sleep $INTERVAL
+          done
+
+          echo "❌ O serviço $SERVICE_NAME não ficou saudável dentro do tempo limite."
+          docker service ps "$SERVICE_NAME" --no-trunc
+          echo "📋 Logs finais:"
+          docker service logs "$SERVICE_NAME" --tail 100
+          exit 1
+
+# ----------------------------------------------------------------------
+# JOB 5 ▸ NOTIFY
+# ----------------------------------------------------------------------
+
+  notify:
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [ build-test-scan, deploy-selfhosted ]
+    steps:
+      - name: Slack notify
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RESULT: ${{ needs.deploy-selfhosted.result }}
+        shell: bash
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "ℹ️ Slack webhook não configurado; etapa ignorada" && exit 0
+          fi
+          COLOR=good && [ "$RESULT" != "success" ] && COLOR=danger
+          curl -X POST -H 'Content-type: application/json' \
+               --data "{\"text\":\"Bate-papo – $RESULT\",\"attachments\":[{\"color\":\"$COLOR\"}]}" \
+               "$WEBHOOK"

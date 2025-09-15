@@ -176,13 +176,6 @@ spring:
   config:
     activate:
       on-profile: prod
-      
-  # Habilitar Key Vault em produção
-  cloud:
-    azure:
-      keyvault:
-        secret:
-          enabled: ${AZURE_KEYVAULT_ENABLED:true}
           
   r2dbc:
     pool:
