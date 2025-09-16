@@ -34,7 +34,7 @@ services:
       - conexao-de-sorte-redis-host=conexao-redis
       - conexao-de-sorte-redis-port=6379
       - conexao-de-sorte-redis-password=${REDIS_PASSWORD}
-      - conexao-de-sorte-redis-database=2
+      - conexao-de-sorte-redis-database=5  # Alterado de 2 para 5 para evitar conflito com gateway
       
       # JWT
       - conexao-de-sorte-jwt-jwks-uri=http://autenticacao-service:8081/.well-known/jwks.json
