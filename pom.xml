@@ -19,7 +19,7 @@
     <description>Microserviço de bate-papo em tempo real com Spring WebFlux, R2DBC, SSE e WebSockets</description>
 
     <properties>
-        <java.version>24</java.version>
+        <java.version>25</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         
         <!-- Dependências para documentação -->
