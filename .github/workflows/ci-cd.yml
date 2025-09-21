@@ -1,4 +1,4 @@
-name: "💬 Bate-papo – CI/CD Pipeline"
+name: "💬 Bate-papo - CI/CD Pipeline"
 
 on:
   push:
@@ -339,7 +339,7 @@ jobs:
           MIN=$((ELAPSED/60))
           SEC=$((ELAPSED%60))
           echo "============================================="
-          echo "💬 BATE-PAPO – RESUMO"
+          echo "💬 BATE-PAPO - RESUMO"
           echo "Stack........: ${STACK_NAME}"
           echo "Imagem.......: ${IMAGE_URI}"
           echo "Tempo........: ${MIN}m ${SEC}s"
