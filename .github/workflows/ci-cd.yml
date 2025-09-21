@@ -176,68 +176,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Obter secrets essenciais do Key Vault
-        id: keyvault
-        uses: azure/CLI@v1
+      - name: 🔐 Get secrets from Azure Key Vault
+        uses: azure/get-keyvault-secrets@v1
         with:
-          azcliversion: 2.76.0
-          inlineScript: |
-            set -euo pipefail
+          keyvault: "kv-conexao-de-sorte"
+          secrets: |
+            conexao-de-sorte-database-r2dbc-url
+            conexao-de-sorte-database-username
+            conexao-de-sorte-database-password
+            conexao-de-sorte-redis-host
+            conexao-de-sorte-redis-port
+            conexao-de-sorte-redis-password
+            conexao-de-sorte-redis-database
+            conexao-de-sorte-jwt-secret
+            conexao-de-sorte-jwt-issuer
+            conexao-de-sorte-jwt-signing-key
+            conexao-de-sorte-jwt-verification-key
+            conexao-de-sorte-server-port
+            conexao-de-sorte-cors-allowed-origins
+            conexao-de-sorte-cors-allow-credentials
+        id: kv
 
-            KEYVAULT_NAME="${{ secrets.AZURE_KEYVAULT_NAME }}"
-            if [[ -z "$KEYVAULT_NAME" ]]; then
-              echo "❌ AZURE_KEYVAULT_NAME não configurado"
-              exit 1
-            fi
-
-            if [[ "$KEYVAULT_NAME" == *"***"* ]]; then
-              KEYVAULT_NAME="kv-conexao-de-sorte"
-            fi
-
-            if ! az keyvault show --name "$KEYVAULT_NAME" >/dev/null 2>&1; then
-              echo "❌ Key Vault '$KEYVAULT_NAME' não acessível"
-              exit 1
-            fi
-
-            declare -a essential_secrets=(
-              conexao-de-sorte-database-r2dbc-url
-              conexao-de-sorte-database-username
-              conexao-de-sorte-database-password
-              conexao-de-sorte-redis-host
-              conexao-de-sorte-redis-port
-              conexao-de-sorte-redis-password
-              conexao-de-sorte-redis-database
-              conexao-de-sorte-jwt-secret
-              conexao-de-sorte-jwt-issuer
-              conexao-de-sorte-jwt-jwks-uri
-              conexao-de-sorte-cors-allowed-origins
-              conexao-de-sorte-cors-allow-credentials
-              conexao-de-sorte-ssl-enabled
-              conexao-de-sorte-server-port
-            )
-
-            obtained=0
-            for secret in "${essential_secrets[@]}"; do
-              echo "🔍 Buscando secret: $secret"
-              if value=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" --name "$secret" --query value -o tsv 2>/dev/null); then
-                if [[ -n "$value" && "$value" != "null" ]]; then
-                  var_name=$(echo "$secret" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-                  echo "$var_name=$value" >> "$GITHUB_ENV"
-                  echo "::add-mask::$value"
-                  obtained=$((obtained + 1))
-                else
-                  echo "⚠️ $secret encontrado porém vazio"
-                fi
-              else
-                echo "⚠️ $secret não localizado"
-              fi
-            done
-
-            echo "📊 Secrets obtidos: $obtained/${#essential_secrets[@]}"
-            if [[ $obtained -lt 8 ]]; then
-              echo "❌ Quantidade insuficiente de secrets"
-              exit 1
-            fi
+      - name: 🔒 Mask sensitive values
+        run: |
+          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-database-password }}"
+          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-redis-password }}"
+          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-jwt-secret }}"
+          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-jwt-signing-key }}"
 
       - name: Preparar rede overlay
         shell: bash
@@ -258,17 +223,27 @@ jobs:
 
       - name: Deploy da stack
         shell: bash
+        env:
+          # Banco de Dados
+          DATABASE_R2DBC_URL: ${{ steps.kv.outputs.conexao-de-sorte-database-r2dbc-url }}
+          DATABASE_USERNAME: ${{ steps.kv.outputs.conexao-de-sorte-database-username }}
+          DATABASE_PASSWORD: ${{ steps.kv.outputs.conexao-de-sorte-database-password }}
+          # Redis
+          REDIS_HOST: ${{ steps.kv.outputs.conexao-de-sorte-redis-host }}
+          REDIS_PORT: ${{ steps.kv.outputs.conexao-de-sorte-redis-port }}
+          REDIS_PASSWORD: ${{ steps.kv.outputs.conexao-de-sorte-redis-password }}
+          REDIS_DATABASE: ${{ steps.kv.outputs.conexao-de-sorte-redis-database }}
+          # JWT
+          CONEXAO_DE_SORTE_JWT_SECRET: ${{ steps.kv.outputs.conexao-de-sorte-jwt-secret }}
+          CONEXAO_DE_SORTE_JWT_ISSUER: ${{ steps.kv.outputs.conexao-de-sorte-jwt-issuer }}
+          CONEXAO_DE_SORTE_JWT_SIGNING_KEY: ${{ steps.kv.outputs.conexao-de-sorte-jwt-signing-key }}
+          CONEXAO_DE_SORTE_JWT_VERIFICATION_KEY: ${{ steps.kv.outputs.conexao-de-sorte-jwt-verification-key }}
+          # Server e CORS
+          CONEXAO_DE_SORTE_SERVER_PORT: ${{ steps.kv.outputs.conexao-de-sorte-server-port }}
+          CONEXAO_DE_SORTE_CORS_ALLOWED_ORIGINS: ${{ steps.kv.outputs.conexao-de-sorte-cors-allowed-origins }}
+          CONEXAO_DE_SORTE_CORS_ALLOW_CREDENTIALS: ${{ steps.kv.outputs.conexao-de-sorte-cors-allow-credentials }}
         run: |
           set -euo pipefail
-
-          export DATABASE_R2DBC_URL="${CONEXAO_DE_SORTE_DATABASE_R2DBC_URL:-}"
-          export DATABASE_USERNAME="${CONEXAO_DE_SORTE_DATABASE_USERNAME:-}"
-          export DATABASE_PASSWORD="${CONEXAO_DE_SORTE_DATABASE_PASSWORD:-}"
-          export REDIS_HOST="${CONEXAO_DE_SORTE_REDIS_HOST:-conexao-redis}"
-          export REDIS_PORT="${CONEXAO_DE_SORTE_REDIS_PORT:-6379}"
-          export REDIS_PASSWORD="${CONEXAO_DE_SORTE_REDIS_PASSWORD:-}"
-          export REDIS_DATABASE="${CONEXAO_DE_SORTE_REDIS_DATABASE:-5}"
-          export CONEXAO_DE_SORTE_SERVER_PORT="${CONEXAO_DE_SORTE_SERVER_PORT:-8090}"
 
           if [[ -z "$DATABASE_USERNAME" || -z "$DATABASE_PASSWORD" ]]; then
             echo "❌ Secrets essenciais de banco ausentes"
