@@ -111,7 +111,7 @@ ENV CONEXAO_DE_SORTE_DATABASE_URL=${CONEXAO_DE_SORTE_DATABASE_URL} \
 # Variáveis de ambiente da aplicação devem ser fornecidas externamente (CI/Compose/Helm)
 
 # Expor porta da aplicação
-EXPOSE 8083
+
 
 # Health check nativo
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
@@ -145,7 +145,7 @@ ENV JAVA_OPTS="$JAVA_OPTS \
     -Dlogging.level.br.tec.facilitaservicos=DEBUG"
 
 # Expor porta de debug
-EXPOSE 5005
+
 
 # Comando para debug
 CMD ["sh", "-c", "echo 'Starting CHAT service in DEBUG mode on port 5005' && java $JAVA_OPTS -jar app.jar"]
