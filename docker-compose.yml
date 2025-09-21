@@ -16,14 +16,8 @@ services:
   # 💬 MICROSERVIÇO BATE-PAPO
   # ========================================
   batepapo-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: release
-    container_name: batepapo-microservice
+    image: ghcr.io/wibson82/conexao-de-sorte-backend-batepapo:latest
     restart: unless-stopped
-    ports:
-      - "8090:8090"
     environment:
       # Database (infraestrutura centralizada)
       - conexao-de-sorte-database-r2dbc-url=${DATABASE_R2DBC_URL:-r2dbc:mysql://conexao-mysql:3306/conexao_chat}
@@ -83,7 +77,16 @@ services:
         aliases:
           - conexao-batepapo
     volumes:
-      - ./logs:/app/logs
+      - batepapo-logs:/app/logs
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   # ========================================
   # 🗄️ OBSERVAÇÃO: MySQL removido - usa infraestrutura centralizada
@@ -94,8 +97,8 @@ services:
 # ========================================
 # 💾 VOLUMES PERSISTENTES
 # ========================================
-# Volumes do MySQL removidos - usa infraestrutura compartilhada
 volumes:
+  batepapo-logs:
 
 # ========================================
 # 🌐 REDE EXTERNA
