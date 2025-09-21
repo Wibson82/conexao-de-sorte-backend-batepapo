@@ -23,26 +23,29 @@ services:
     container_name: batepapo-microservice
     restart: unless-stopped
     ports:
-      - "8079:8079"
+      - "8090:8090"
     environment:
       # Database (infraestrutura centralizada)
-      - conexao-de-sorte-database-r2dbc-url=r2dbc:mysql://conexao-mysql:3306/conexao_chat
-      - conexao-de-sorte-database-username=${DATABASE_USERNAME}
-      - conexao-de-sorte-database-password=${DATABASE_PASSWORD}
+      - conexao-de-sorte-database-r2dbc-url=${DATABASE_R2DBC_URL:-r2dbc:mysql://conexao-mysql:3306/conexao_chat}
+      - conexao-de-sorte-database-username=${DATABASE_USERNAME:?DATABASE_USERNAME nao definido}
+      - conexao-de-sorte-database-password=${DATABASE_PASSWORD:?DATABASE_PASSWORD nao definido}
       
       # Redis - Infraestrutura Core
-      - conexao-de-sorte-redis-host=conexao-redis
-      - conexao-de-sorte-redis-port=6379
-      - conexao-de-sorte-redis-password=${REDIS_PASSWORD}
-      - conexao-de-sorte-redis-database=5  # Alterado de 2 para 5 para evitar conflito com gateway
+      - conexao-de-sorte-redis-host=${REDIS_HOST:-conexao-redis}
+      - conexao-de-sorte-redis-port=${REDIS_PORT:-6379}
+      - conexao-de-sorte-redis-password=${REDIS_PASSWORD:?REDIS_PASSWORD nao definido}
+      - conexao-de-sorte-redis-database=${REDIS_DATABASE:-5}  # Alterado de 2 para 5 para evitar conflito com gateway
       
       # JWT
-      - conexao-de-sorte-jwt-jwks-uri=http://autenticacao-service:8081/.well-known/jwks.json
-      - conexao-de-sorte-jwt-issuer=https://auth.conexaodesorte.com
+      - conexao-de-sorte-jwt-jwks-uri=${CONEXAO_DE_SORTE_JWT_JWKS_URI:-http://autenticacao-service:8081/.well-known/jwks.json}
+      - conexao-de-sorte-jwt-issuer=${CONEXAO_DE_SORTE_JWT_ISSUER:-https://auth.conexaodesorte.com}
       
       # CORS
-      - conexao-de-sorte-cors-allowed-origins=http://localhost:*,https://*.conexaodesorte.com
-      - conexao-de-sorte-cors-allow-credentials=true
+      - conexao-de-sorte-cors-allowed-origins=${CONEXAO_DE_SORTE_CORS_ALLOWED_ORIGINS:-http://localhost:*,https://*.conexaodesorte.com}
+      - conexao-de-sorte-cors-allow-credentials=${CONEXAO_DE_SORTE_CORS_ALLOW_CREDENTIALS:-true}
+
+      # Server port
+      - conexao-de-sorte-server-port=${CONEXAO_DE_SORTE_SERVER_PORT:-8090}
       
       # Features
       - FEATURE_BATEPAPO_MS=true
@@ -70,13 +73,15 @@ services:
       # Performance
       - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8079/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     networks:
-      - conexao-network-swarm
+      conexao-network-swarm:
+        aliases:
+          - conexao-batepapo
     volumes:
       - ./logs:/app/logs
 

@@ -14,27 +14,343 @@ on:
         type: choice
         options: [ staging, production ]
 
-# ----------------------------------------------------------------------
-# PARÂMETROS GERAIS
-# ----------------------------------------------------------------------
-
 env:
   SERVICE_NAME: batepapo
+  STACK_NAME: conexao-batepapo
+  DOCKER_NETWORK_NAME: conexao-network-swarm
   TZ: America/Sao_Paulo
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
   cancel-in-progress: false
 
-# ----------------------------------------------------------------------
-# JOB 1 ▸ VALIDAÇÃO DO WORKSPACE
-# ----------------------------------------------------------------------
-
 jobs:
   validate-environment:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      # REMOVIDO: Azure CLI não deve ser usado em produção
-      # Docker Secrets são sincronizados pela infraestrutura-core
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validar estrutura
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x .github/workflows/scripts/validate-required-files.sh
+          ./.github/workflows/scripts/validate-required-files.sh microservice
+
+  build-and-test:
+    needs: validate-environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 24 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "24"
+          cache: maven
+
+      - name: Executar build e testes
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mvnw -B clean verify
+
+      - name: Publicar artefato JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: batepapo-jar
+          path: target/conexao-de-sorte-backend-batepapo-*.jar
+          retention-days: 1
+
+      - name: Publicar artefatos de deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: batepapo-configs
+          path: |
+            docker-compose.yml
+            Dockerfile
+            docker/
+          retention-days: 1
+
+  build-image:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-uri: ${{ steps.build-and-push.outputs.image-uri }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Baixar artefatos JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: batepapo-jar
+          path: target/
+
+      - name: Baixar artefatos de deploy
+        uses: actions/download-artifact@v4
+        with:
+          name: batepapo-configs
+          path: .
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push da imagem
+        id: build-and-push
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_LOWERCASE=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+          IMAGE_URI="ghcr.io/${REPO_LOWERCASE}/conexao-de-sorte-backend-batepapo:${TIMESTAMP}"
+
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
+            --tag "$IMAGE_URI" \
+            --tag "ghcr.io/${REPO_LOWERCASE}/conexao-de-sorte-backend-batepapo:latest" \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            .
+
+          echo "image-uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+  deploy-selfhosted:
+    needs: build-image
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    runs-on: [ self-hosted, Linux, X64, conexao, conexao-de-sorte-backend-batepapo ]
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    env:
+      STACK_NAME: conexao-batepapo
+      DOCKER_NETWORK_NAME: conexao-network-swarm
+      IMAGE_URI: ${{ needs.build-image.outputs.image-uri }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Definir horário inicial
+        run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Baixar artefatos de deploy
+        uses: actions/download-artifact@v4
+        with:
+          name: batepapo-configs
+          path: .
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Obter secrets essenciais do Key Vault
+        id: keyvault
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.76.0
+          inlineScript: |
+            set -euo pipefail
+
+            KEYVAULT_NAME="${{ secrets.AZURE_KEYVAULT_NAME }}"
+            if [[ -z "$KEYVAULT_NAME" ]]; then
+              echo "❌ AZURE_KEYVAULT_NAME não configurado"
+              exit 1
+            fi
+
+            if [[ "$KEYVAULT_NAME" == *"***"* ]]; then
+              KEYVAULT_NAME="kv-conexao-de-sorte"
+            fi
+
+            if ! az keyvault show --name "$KEYVAULT_NAME" >/dev/null 2>&1; then
+              echo "❌ Key Vault '$KEYVAULT_NAME' não acessível"
+              exit 1
+            fi
+
+            declare -a essential_secrets=(
+              conexao-de-sorte-database-r2dbc-url
+              conexao-de-sorte-database-username
+              conexao-de-sorte-database-password
+              conexao-de-sorte-redis-host
+              conexao-de-sorte-redis-port
+              conexao-de-sorte-redis-password
+              conexao-de-sorte-redis-database
+              conexao-de-sorte-jwt-secret
+              conexao-de-sorte-jwt-issuer
+              conexao-de-sorte-jwt-jwks-uri
+              conexao-de-sorte-cors-allowed-origins
+              conexao-de-sorte-cors-allow-credentials
+              conexao-de-sorte-ssl-enabled
+              conexao-de-sorte-server-port
+            )
+
+            obtained=0
+            for secret in "${essential_secrets[@]}"; do
+              echo "🔍 Buscando secret: $secret"
+              if value=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" --name "$secret" --query value -o tsv 2>/dev/null); then
+                if [[ -n "$value" && "$value" != "null" ]]; then
+                  var_name=$(echo "$secret" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+                  echo "$var_name=$value" >> "$GITHUB_ENV"
+                  echo "::add-mask::$value"
+                  obtained=$((obtained + 1))
+                else
+                  echo "⚠️ $secret encontrado porém vazio"
+                fi
+              else
+                echo "⚠️ $secret não localizado"
+              fi
+            done
+
+            echo "📊 Secrets obtidos: $obtained/${#essential_secrets[@]}"
+            if [[ $obtained -lt 8 ]]; then
+              echo "❌ Quantidade insuficiente de secrets"
+              exit 1
+            fi
+
+      - name: Preparar rede overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! docker network ls --format '{{.Name}}' | grep -q "^${DOCKER_NETWORK_NAME}$"; then
+            docker network create --driver overlay --attachable "${DOCKER_NETWORK_NAME}" || true
+          fi
+
+      - name: Remover stack anterior
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker stack ls --format '{{.Name}}' | grep -q "^${STACK_NAME}$"; then
+            docker stack rm "${STACK_NAME}"
+            sleep 15
+          fi
+
+      - name: Deploy da stack
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export DATABASE_R2DBC_URL="${CONEXAO_DE_SORTE_DATABASE_R2DBC_URL:-}"
+          export DATABASE_USERNAME="${CONEXAO_DE_SORTE_DATABASE_USERNAME:-}"
+          export DATABASE_PASSWORD="${CONEXAO_DE_SORTE_DATABASE_PASSWORD:-}"
+          export REDIS_HOST="${CONEXAO_DE_SORTE_REDIS_HOST:-conexao-redis}"
+          export REDIS_PORT="${CONEXAO_DE_SORTE_REDIS_PORT:-6379}"
+          export REDIS_PASSWORD="${CONEXAO_DE_SORTE_REDIS_PASSWORD:-}"
+          export REDIS_DATABASE="${CONEXAO_DE_SORTE_REDIS_DATABASE:-5}"
+          export CONEXAO_DE_SORTE_SERVER_PORT="${CONEXAO_DE_SORTE_SERVER_PORT:-8090}"
+
+          if [[ -z "$DATABASE_USERNAME" || -z "$DATABASE_PASSWORD" ]]; then
+            echo "❌ Secrets essenciais de banco ausentes"
+            exit 1
+          fi
+
+          docker pull "$IMAGE_URI"
+          COMPOSE_PROJECT_NAME="${STACK_NAME}" docker stack deploy -c docker-compose.yml "${STACK_NAME}"
+          sleep 30
+
+      - name: Verificar serviços
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker service ls --filter name="${STACK_NAME}_" --format "table {{.Name}}\t{{.Replicas}}\t{{.Image}}"
+
+      - name: Validar health via Traefik
+        shell: bash
+        env:
+          HEALTH_MONITOR_URL: https://traefik.conexaodesorte.com.br/health/service/batepapo
+        run: |
+          set -euo pipefail
+          TIMEOUT_TOTAL=300
+          INTERVAL=10
+          elapsed=0
+          last_response=""
+          status=""
+
+          while [ $elapsed -lt $TIMEOUT_TOTAL ]; do
+            echo "🔎 Consultando Traefik ($elapsed/${TIMEOUT_TOTAL}s)..."
+            response=$(curl -sf --max-time 10 "$HEALTH_MONITOR_URL" 2>/dev/null || true)
+            last_response="$response"
+
+            if [[ -n "$response" ]]; then
+              status=$(printf '%s' "$response" | python3 -c "import json, sys; data=json.load(sys.stdin); print(data.get('status',''))" 2>/dev/null || true)
+              status=${status//$'\n'/}
+              echo "📊 Status reportado: ${status:-indefinido}"
+              if [[ "$status" == "healthy" ]]; then
+                echo "✅ Traefik confirmou Batepapo como healthy"
+                exit 0
+              fi
+            else
+              echo "⚠️ Traefik sem resposta nesta tentativa"
+            fi
+
+            sleep "$INTERVAL"
+            elapsed=$((elapsed + INTERVAL))
+          done
+
+          echo "❌ Traefik nao confirmou Batepapo como healthy apos ${TIMEOUT_TOTAL}s"
+          echo "📝 Ultima resposta recebida: ${last_response:-<sem resposta>}"
+          exit 1
+
+      - name: Limpeza pós-deploy
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker image prune -f --filter "until=168h" || true
+          docker container prune -f --filter "until=24h" || true
+
+      - name: Resumo do deploy
+        shell: bash
+        run: |
+          END_TIME=$(date +%s)
+          START_TIME=${START_TIME:-$END_TIME}
+          ELAPSED=$((END_TIME - START_TIME))
+          MIN=$((ELAPSED/60))
+          SEC=$((ELAPSED%60))
+          echo "============================================="
+          echo "💬 BATE-PAPO – RESUMO"
+          echo "Stack........: ${STACK_NAME}"
+          echo "Imagem.......: ${IMAGE_URI}"
+          echo "Tempo........: ${MIN}m ${SEC}s"
+          echo "============================================="
+
+  notify:
+    if: always()
+    needs: [ build-and-test, deploy-selfhosted ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Registrar status final
+        shell: bash
+        run: |
+          echo "Pipeline concluído com status: ${{ needs.deploy-selfhosted.result }}"
