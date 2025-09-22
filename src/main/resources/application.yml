@@ -31,21 +31,7 @@ spring:
         secret:
           enabled: ${AZURE_KEYVAULT_ENABLED:false}
 
-  # Redis para cache (Bate-papo usa DB 4)
-  data:
-    redis:
-      host: ${conexao-de-sorte-redis-host:conexao-redis}
-      port: ${conexao-de-sorte-redis-port:6379}
-      password: ${conexao-de-sorte-redis-password:senha_teste}
-      database: ${conexao-de-sorte-redis-database:4}  # Bate-papo = DB 4
-      timeout: 2000ms
-      lettuce:
-        pool:
-          enabled: true
-          max-active: 15  # Chat precisa de mais conexões
-          max-idle: 8
-          min-idle: 3
-          max-wait: 3000ms
+  # Redis para cache (Bate-papo usa DB 4) - Configuração principal na seção data:redis mais completa
   r2dbc:
     # Preferencialmente usa -database-r2dbc-url; mantém compat com -database-url
     url: ${conexao-de-sorte-database-r2dbc-url:${conexao-de-sorte-database-url:r2dbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}}
