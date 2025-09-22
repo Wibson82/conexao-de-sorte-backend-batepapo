@@ -6,16 +6,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * ============================================================================
- * 🧪 TESTE SEM SPRING - COMPATÍVEL JAVA 24
+ * 🧪 TESTE SEM SPRING - COMPATÍVEL JAVA 25
  * ============================================================================
  * 
- * Teste puro sem Spring Boot para verificar compatibilidade Java 24:
+ * Teste puro sem Spring Boot para verificar compatibilidade Java 25:
  * - Sem Mockito
  * - Sem Spring
  * - Apenas JUnit 5
  * - Teste de funcionalidades básicas
  * 
- * @author Sistema de Testes Java 24
+ * @author Sistema de Testes Java 25
  * @version 1.0
  * @since 2024
  */
@@ -24,16 +24,16 @@ class NoSpringTest {
     @Test
     void testJavaVersion() {
         String javaVersion = System.getProperty("java.version");
-        assertTrue(javaVersion.startsWith("24"), 
+        assertTrue(javaVersion.startsWith("25"), 
             "Should be running on Java 24, but was: " + javaVersion);
     }
 
     @Test
     void testBasicFunctionality() {
         // Teste de funcionalidade básica do Java
-        String test = "Hello Java 24";
+        String test = "Hello Java 25";
         assertNotNull(test);
-        assertEquals("Hello Java 24", test);
+        assertEquals("Hello Java 25", test);
         assertTrue(test.contains("Java"));
     }
 

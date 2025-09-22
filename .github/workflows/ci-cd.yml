@@ -47,7 +47,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar Java 24 (Temurin)
+      - name: Configurar Java 25 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin

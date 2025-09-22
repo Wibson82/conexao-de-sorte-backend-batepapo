@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * ============================================================================
- * 🧪 TESTE BÁSICO DE APLICAÇÃO - COMPATÍVEL JAVA 24
+ * 🧪 TESTE BÁSICO DE APLICAÇÃO - COMPATÍVEL JAVA 25
  * ============================================================================
  * 
  * Teste mínimo para verificar se a aplicação inicializa:
@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * - Configuração mínima
  * - Apenas teste de contexto
  * 
- * @author Sistema de Testes Java 24
+ * @author Sistema de Testes Java 25
  * @version 1.0
  * @since 2024
  */
@@ -51,9 +51,9 @@ class BasicApplicationTest {
 
     @Test
     void testJavaVersion() {
-        // Verificar se estamos usando Java 24
+        // Verificar se estamos usando Java 25
         String javaVersion = System.getProperty("java.version");
-        assertTrue(javaVersion.startsWith("24"), "Should be running on Java 24");
+        assertTrue(javaVersion.startsWith("25"), "Should be running on Java 25");
     }
 
     @Test

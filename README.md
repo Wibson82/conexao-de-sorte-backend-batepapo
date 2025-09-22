@@ -43,7 +43,7 @@ Microserviço **100% reativo** para bate-papo em tempo real, construído com Spr
 
 ## 🛠️ Stack Tecnológica
 
-- **Java 24** - Linguagem principal
+- **Java 25+** - Linguagem principal
 - **Spring Boot 3.5+** - Framework base
 - **Spring WebFlux** - Programação reativa
 - **Spring Security** - Segurança JWT

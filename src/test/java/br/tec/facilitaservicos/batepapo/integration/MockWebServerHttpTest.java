@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * ============================================================================
- * 🧪 TESTE COM MOCKWEBSERVER (OKHTTP) - COMPATÍVEL JAVA 24
+ * 🧪 TESTE COM MOCKWEBSERVER (OKHTTP) - COMPATÍVEL JAVA 25
  * ============================================================================
  * 
  * Testa HTTP clients usando MockWebServer do OkHttp:
@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - Teste de diferentes status codes
  * - Sem dependência do Mockito
  * 
- * @author Sistema de Testes Java 24
+ * @author Sistema de Testes Java 25
  * @version 1.0
  * @since 2024
  */
