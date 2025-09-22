@@ -157,35 +157,9 @@ springdoc:
     tagsSorter: alpha
   show-actuator: false
 
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-          
-  r2dbc:
-    pool:
-      initial-size: 10
-      max-size: 50
-  flyway:
+# Production configuration optimizations
+batepapo:
+  production:
+    pool-size-max: 50
     clean-disabled: true
-
-server:
-  port: ${conexao-de-sorte-server-port:8079}
-
-management:
-  endpoint:
-    health:
-      show-details: never
-
-logging:
-  level:
-    "[br.tec.facilitaservicos.batepapo]": INFO
-    root: WARN
-    "[org.springframework.security]": WARN
-    "[org.springframework.r2dbc]": WARN
-    "[io.r2dbc.mysql]": WARN
-    "[com.azure]": WARN
-    
-  file:
-    name: ${LOG_FILE_PATH:/app/logs/batepapo.log}
+    log-level: INFO
