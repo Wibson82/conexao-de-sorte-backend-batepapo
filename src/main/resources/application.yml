@@ -33,10 +33,10 @@ spring:
 
   # Redis para cache (Bate-papo usa DB 4) - Configuração principal na seção data:redis mais completa
   r2dbc:
-    # Preferencialmente usa -database-r2dbc-url; mantém compat com -database-url
-    url: ${conexao-de-sorte-database-r2dbc-url:${conexao-de-sorte-database-url:r2dbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}}
-    username: ${conexao-de-sorte-database-username:}
-    password: ${conexao-de-sorte-database-password:}
+    # Padrão concatenação: secret base + parâmetros específicos
+    url: ${conexao-de-sorte-database-r2dbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo
+    username: ${conexao-de-sorte-database-username}
+    password: ${conexao-de-sorte-database-password}
     pool:
       initial-size: 1
       max-size: 15
@@ -47,10 +47,10 @@ spring:
       validation-query: SELECT 1
   flyway:
     enabled: true
-    # Padroniza uso de -database-jdbc-url, mantendo compatibilidade com -database-flyway-url
-    url: ${conexao-de-sorte-database-jdbc-url:${conexao-de-sorte-database-flyway-url:jdbc:mysql://mysql-proxy:6033/conexao_chat?useSSL=true&allowPublicKeyRetrieval=false}}
-    user: ${conexao-de-sorte-database-username:}
-    password: ${conexao-de-sorte-database-password:}
+    # Padrão concatenação: secret base + parâmetros específicos
+    url: ${conexao-de-sorte-database-jdbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo
+    user: ${conexao-de-sorte-database-username}
+    password: ${conexao-de-sorte-database-password}
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
