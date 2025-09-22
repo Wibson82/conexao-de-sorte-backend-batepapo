@@ -21,13 +21,13 @@ services:
     environment:
       # Database (infraestrutura centralizada)
       - conexao-de-sorte-database-r2dbc-url=${DATABASE_R2DBC_URL:-r2dbc:mysql://conexao-mysql:3306/conexao_chat}
-      - conexao-de-sorte-database-username=${DATABASE_USERNAME:?DATABASE_USERNAME nao definido}
-      - conexao-de-sorte-database-password=${DATABASE_PASSWORD:?DATABASE_PASSWORD nao definido}
+      - conexao-de-sorte-database-username=${DATABASE_USERNAME:-conexao_user}
+      - conexao-de-sorte-database-password=${DATABASE_PASSWORD:-conexao_pass}
       
       # Redis - Infraestrutura Core
       - conexao-de-sorte-redis-host=${REDIS_HOST:-conexao-redis}
       - conexao-de-sorte-redis-port=${REDIS_PORT:-6379}
-      - conexao-de-sorte-redis-password=${REDIS_PASSWORD:?REDIS_PASSWORD nao definido}
+      - conexao-de-sorte-redis-password=${REDIS_PASSWORD:-redis_pass}
       - conexao-de-sorte-redis-database=${REDIS_DATABASE:-5}  # Alterado de 2 para 5 para evitar conflito com gateway
       
       # JWT
