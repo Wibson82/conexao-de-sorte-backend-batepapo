@@ -1,0 +1,96 @@
+Corrija o erro "Run set -euo pipefail
+� Validando arquivos obrigatórios para projeto tipo: microservice
+� Serviço: conexao-de-sorte-backend-batepapo
+
+============================================================================
+� VALIDADOR DE ARQUIVOS OBRIGATÓRIOS
+============================================================================
+� Verificando arquivos obrigatórios:
+✅ Dockerfile
+✅ docker-compose.yml
+✅ pom.xml
+✅ src/main/resources/application.yml
+✅ src/main/resources/application-azure.yml
+✅ src/main/java
+
+� Verificando arquivos opcionais:
+⚠️  src/main/resources/application-prod.yml (opcional - ausente)
+⚠️  src/main/resources/logback-spring.xml (opcional - ausente)
+
+� Validando sintaxe YAML...
+✅ src/main/resources/application-azure.yml: Sintaxe YAML válida
+❌ src/main/resources/application.yml: Erro YAML - mapping values are not allowed here
+  in "src/main/resources/application.yml", line 108, column 72
+❌ src/main/resources/application.yml: Erro de sintaxe YAML
+Error: Process completed with exit code 1." e em seguida Analise esse exemplo de step funcional e o replique no projeto atual, em seguida, execute o commit e o push: "Run # Usar endpoint do Key Vault se disponível, senão usar nome
+  # Usar endpoint do Key Vault se disponível, senão usar nome
+  KEYVAULT_ENDPOINT="***"
+  if [[ -n "$KEYVAULT_ENDPOINT" ]]; then
+    # Extrair o nome do Key Vault do endpoint (formato:
+    KEYVAULT_NAME=$(echo "$KEYVAULT_ENDPOINT" | sed 's|')
+    echo "� Usando Key Vault do endpoint: $KEYVAULT_NAME"
+  else
+    KEYVAULT_NAME="***"
+    echo "� Usando Key Vault do nome: $KEYVAULT_NAME"
+  fi
+
+  # Usar action para obter segredos
+  echo "� Obtendo segredos do Key Vault: $KEYVAULT_NAME"
+
+  # Como a action não aceita variáveis, vamos usar Azure CLI diretamente
+  secrets_list="conexao-de-sorte-database-r2dbc-url,conexao-de-sorte-database-username,conexao-de-sorte-database-password,conexao-de-sorte-redis-host,conexao-de-sorte-redis-port,conexao-de-sorte-redis-password,conexao-de-sorte-redis-database,conexao-de-sorte-jwt-secret,conexao-de-sorte-jwt-issuer,conexao-de-sorte-jwt-signing-key,conexao-de-sorte-jwt-verification-key,conexao-de-sorte-server-port,conexao-de-sorte-cors-allowed-origins,conexao-de-sorte-cors-allow-credentials"
+
+  IFS=',' read -ra SECRETS_ARRAY <<< "$secrets_list"
+  for secret_name in "${SECRETS_ARRAY[@]}"; do
+    echo "� Obtendo segredo: $secret_name"
+    secret_value=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" --name "$secret_name" --query 'value' -o tsv 2>/dev/null || echo "")
+
+    if [[ -n "$secret_value" ]]; then
+      echo "✅ Segredo obtido: $secret_name"
+      # Salvar com o nome original (com traços) para compatibilidade com o step de validação
+      echo "${secret_name}=${secret_value}" >> $GITHUB_OUTPUT
+      # Também salvar como variável de ambiente para uso posterior
+      env_var_name=$(echo "$secret_name" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+      echo "${env_var_name}=${secret_value}" >> $GITHUB_ENV
+    else
+      echo "⚠️ Segredo não encontrado: $secret_name"
+    fi
+  done
+
+  echo "✅ Obtenção de segredos concluída"
+  shell: /usr/bin/bash -e {0}
+  env:
+    SERVICE_NAME: gateway
+    STACK_NAME: conexao-gateway
+    DOCKER_NETWORK_NAME: conexao-network-swarm
+� Usando Key Vault do endpoint: kv-conexao-de-sorte
+� Obtendo segredos do Key Vault: kv-conexao-de-sorte
+� Obtendo segredo: conexao-de-sorte-database-r2dbc-url
+✅ Segredo obtido: conexao-de-sorte-database-r2dbc-url
+� Obtendo segredo: conexao-de-sorte-database-username
+✅ Segredo obtido: conexao-de-sorte-database-username
+� Obtendo segredo: conexao-de-sorte-database-password
+✅ Segredo obtido: conexao-de-sorte-database-password
+� Obtendo segredo: conexao-de-sorte-redis-host
+✅ Segredo obtido: conexao-de-sorte-redis-host
+� Obtendo segredo: conexao-de-sorte-redis-port
+✅ Segredo obtido: conexao-de-sorte-redis-port
+� Obtendo segredo: conexao-de-sorte-redis-password
+✅ Segredo obtido: conexao-de-sorte-redis-password
+� Obtendo segredo: conexao-de-sorte-redis-database
+✅ Segredo obtido: conexao-de-sorte-redis-database
+� Obtendo segredo: conexao-de-sorte-jwt-secret
+✅ Segredo obtido: conexao-de-sorte-jwt-secret
+� Obtendo segredo: conexao-de-sorte-jwt-issuer
+✅ Segredo obtido: conexao-de-sorte-jwt-issuer
+� Obtendo segredo: conexao-de-sorte-jwt-signing-key
+✅ Segredo obtido: conexao-de-sorte-jwt-signing-key
+� Obtendo segredo: conexao-de-sorte-jwt-verification-key
+✅ Segredo obtido: conexao-de-sorte-jwt-verification-key
+� Obtendo segredo: conexao-de-sorte-server-port
+✅ Segredo obtido: conexao-de-sorte-server-port
+� Obtendo segredo: conexao-de-sorte-cors-allowed-origins
+✅ Segredo obtido: conexao-de-sorte-cors-allowed-origins
+� Obtendo segredo: conexao-de-sorte-cors-allow-credentials
+✅ Segredo obtido: conexao-de-sorte-cors-allow-credentials
+✅ Obtenção de segredos concluída"

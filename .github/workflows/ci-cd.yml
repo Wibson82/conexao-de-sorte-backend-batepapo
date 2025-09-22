@@ -177,32 +177,50 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔐 Get secrets from Azure Key Vault
-        uses: azure/get-keyvault-secrets@v1
-        with:
-          keyvault: "kv-conexao-de-sorte"
-          secrets: |
-            conexao-de-sorte-database-r2dbc-url
-            conexao-de-sorte-database-username
-            conexao-de-sorte-database-password
-            conexao-de-sorte-redis-host
-            conexao-de-sorte-redis-port
-            conexao-de-sorte-redis-password
-            conexao-de-sorte-redis-database
-            conexao-de-sorte-jwt-secret
-            conexao-de-sorte-jwt-issuer
-            conexao-de-sorte-jwt-signing-key
-            conexao-de-sorte-jwt-verification-key
-            conexao-de-sorte-server-port
-            conexao-de-sorte-cors-allowed-origins
-            conexao-de-sorte-cors-allow-credentials
-        id: kv
+        shell: bash
+        id: get-secrets
+        run: |
+          set -euo pipefail
+          
+          # Usar endpoint do Key Vault se disponível, senão usar nome
+          KEYVAULT_ENDPOINT="${{ secrets.AZURE_KEYVAULT_ENDPOINT }}"
+          if [[ -n "$KEYVAULT_ENDPOINT" ]]; then
+            # Extrair o nome do Key Vault do endpoint (formato: https://<nome>.vault.azure.net/)
+            KEYVAULT_NAME=$(echo "$KEYVAULT_ENDPOINT" | sed 's|https://\(.*\)\.vault\.azure\.net/.*|\1|')
+            echo "🔑 Usando Key Vault do endpoint: $KEYVAULT_NAME"
+          else
+            KEYVAULT_NAME="kv-conexao-de-sorte"
+            echo "🔑 Usando Key Vault do nome: $KEYVAULT_NAME"
+          fi
+
+          # Lista de segredos a obter
+          secrets_list="conexao-de-sorte-database-r2dbc-url,conexao-de-sorte-database-username,conexao-de-sorte-database-password,conexao-de-sorte-redis-host,conexao-de-sorte-redis-port,conexao-de-sorte-redis-password,conexao-de-sorte-redis-database,conexao-de-sorte-jwt-secret,conexao-de-sorte-jwt-issuer,conexao-de-sorte-jwt-signing-key,conexao-de-sorte-jwt-verification-key,conexao-de-sorte-server-port,conexao-de-sorte-cors-allowed-origins,conexao-de-sorte-cors-allow-credentials"
+
+          IFS=',' read -ra SECRETS_ARRAY <<< "$secrets_list"
+          for secret_name in "${SECRETS_ARRAY[@]}"; do
+            echo "🔍 Obtendo segredo: $secret_name"
+            secret_value=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" --name "$secret_name" --query 'value' -o tsv 2>/dev/null || echo "")
+
+            if [[ -n "$secret_value" ]]; then
+              echo "✅ Segredo obtido: $secret_name"
+              # Salvar com o nome original (com traços) para compatibilidade com o step de validação
+              echo "${secret_name}=${secret_value}" >> $GITHUB_OUTPUT
+              # Também salvar como variável de ambiente para uso posterior
+              env_var_name=$(echo "$secret_name" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+              echo "${env_var_name}=${secret_value}" >> $GITHUB_ENV
+            else
+              echo "⚠️ Segredo não encontrado: $secret_name"
+            fi
+          done
+
+          echo "✅ Obtenção de segredos concluída"
 
       - name: 🔒 Mask sensitive values
         run: |
-          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-database-password }}"
-          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-redis-password }}"
-          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-jwt-secret }}"
-          echo ::add-mask::"${{ steps.kv.outputs.conexao-de-sorte-jwt-signing-key }}"
+          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-database-password }}"
+          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-redis-password }}"
+          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-secret }}"
+          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-signing-key }}"
 
       - name: Preparar rede overlay
         shell: bash
@@ -225,23 +243,23 @@ jobs:
         shell: bash
         env:
           # Banco de Dados
-          DATABASE_R2DBC_URL: ${{ steps.kv.outputs.conexao-de-sorte-database-r2dbc-url }}
-          DATABASE_USERNAME: ${{ steps.kv.outputs.conexao-de-sorte-database-username }}
-          DATABASE_PASSWORD: ${{ steps.kv.outputs.conexao-de-sorte-database-password }}
+          DATABASE_R2DBC_URL: ${{ steps.get-secrets.outputs.conexao-de-sorte-database-r2dbc-url }}
+          DATABASE_USERNAME: ${{ steps.get-secrets.outputs.conexao-de-sorte-database-username }}
+          DATABASE_PASSWORD: ${{ steps.get-secrets.outputs.conexao-de-sorte-database-password }}
           # Redis
-          REDIS_HOST: ${{ steps.kv.outputs.conexao-de-sorte-redis-host }}
-          REDIS_PORT: ${{ steps.kv.outputs.conexao-de-sorte-redis-port }}
-          REDIS_PASSWORD: ${{ steps.kv.outputs.conexao-de-sorte-redis-password }}
-          REDIS_DATABASE: ${{ steps.kv.outputs.conexao-de-sorte-redis-database }}
+          REDIS_HOST: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-host }}
+          REDIS_PORT: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-port }}
+          REDIS_PASSWORD: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-password }}
+          REDIS_DATABASE: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-database }}
           # JWT
-          CONEXAO_DE_SORTE_JWT_SECRET: ${{ steps.kv.outputs.conexao-de-sorte-jwt-secret }}
-          CONEXAO_DE_SORTE_JWT_ISSUER: ${{ steps.kv.outputs.conexao-de-sorte-jwt-issuer }}
-          CONEXAO_DE_SORTE_JWT_SIGNING_KEY: ${{ steps.kv.outputs.conexao-de-sorte-jwt-signing-key }}
-          CONEXAO_DE_SORTE_JWT_VERIFICATION_KEY: ${{ steps.kv.outputs.conexao-de-sorte-jwt-verification-key }}
+          CONEXAO_DE_SORTE_JWT_SECRET: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-secret }}
+          CONEXAO_DE_SORTE_JWT_ISSUER: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-issuer }}
+          CONEXAO_DE_SORTE_JWT_SIGNING_KEY: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-signing-key }}
+          CONEXAO_DE_SORTE_JWT_VERIFICATION_KEY: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-verification-key }}
           # Server e CORS
-          CONEXAO_DE_SORTE_SERVER_PORT: ${{ steps.kv.outputs.conexao-de-sorte-server-port }}
-          CONEXAO_DE_SORTE_CORS_ALLOWED_ORIGINS: ${{ steps.kv.outputs.conexao-de-sorte-cors-allowed-origins }}
-          CONEXAO_DE_SORTE_CORS_ALLOW_CREDENTIALS: ${{ steps.kv.outputs.conexao-de-sorte-cors-allow-credentials }}
+          CONEXAO_DE_SORTE_SERVER_PORT: ${{ steps.get-secrets.outputs.conexao-de-sorte-server-port }}
+          CONEXAO_DE_SORTE_CORS_ALLOWED_ORIGINS: ${{ steps.get-secrets.outputs.conexao-de-sorte-cors-allowed-origins }}
+          CONEXAO_DE_SORTE_CORS_ALLOW_CREDENTIALS: ${{ steps.get-secrets.outputs.conexao-de-sorte-cors-allow-credentials }}
         run: |
           set -euo pipefail
 
