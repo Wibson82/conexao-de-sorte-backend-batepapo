@@ -105,7 +105,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost: ${conexao-de-sorte-redis-host:conexao-redis}
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8081/.well-known/jwks.json}
           issuer-uri: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
   jackson:
     time-zone: America/Sao_Paulo
@@ -114,7 +114,7 @@ spring:
 # Configurações de serviços externos
 services:
   auth:
-    url: ${conexao-de-sorte-auth-service-url:http://localhost: ${conexao-de-sorte-redis-host:conexao-redis}
+    url: ${conexao-de-sorte-auth-service-url:http://localhost:8081}
     endpoints:
       validate: /rest/v1/auth/validate
       users: /rest/v1/users
@@ -158,7 +158,7 @@ management:
       probability: ${TRACING_PROBABILITY:0.1}
   otlp:
     tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost: ${conexao-de-sorte-redis-host:conexao-redis}
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
 springdoc:
   api-docs:
