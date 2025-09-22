@@ -15,31 +15,23 @@ services:
   # ========================================
   # 💬 MICROSERVIÇO BATE-PAPO
   # ========================================
-  batepapo-service:
+  batepapo:
     image: ghcr.io/wibson82/conexao-de-sorte-backend-batepapo:latest
-    restart: unless-stopped
     environment:
-      # Database (infraestrutura centralizada)
-      - conexao-de-sorte-database-r2dbc-url=${DATABASE_R2DBC_URL:-r2dbc:mysql://conexao-mysql:3306/conexao_chat}
-      - conexao-de-sorte-database-username=${DATABASE_USERNAME:-conexao_user}
-      - conexao-de-sorte-database-password=${DATABASE_PASSWORD:-conexao_pass}
-      
-      # Redis - Infraestrutura Core
-      - conexao-de-sorte-redis-host=${REDIS_HOST:-conexao-redis}
-      - conexao-de-sorte-redis-port=${REDIS_PORT:-6379}
-      - conexao-de-sorte-redis-password=${REDIS_PASSWORD:-redis_pass}
-      - conexao-de-sorte-redis-database=${REDIS_DATABASE:-5}  # Alterado de 2 para 5 para evitar conflito com gateway
-      
-      # JWT
-      - conexao-de-sorte-jwt-jwks-uri=${CONEXAO_DE_SORTE_JWT_JWKS_URI:-http://autenticacao-service:8081/.well-known/jwks.json}
-      - conexao-de-sorte-jwt-issuer=${CONEXAO_DE_SORTE_JWT_ISSUER:-https://auth.conexaodesorte.com}
-      
-      # CORS
-      - conexao-de-sorte-cors-allowed-origins=${CONEXAO_DE_SORTE_CORS_ALLOWED_ORIGINS:-http://localhost:*,https://*.conexaodesorte.com}
-      - conexao-de-sorte-cors-allow-credentials=${CONEXAO_DE_SORTE_CORS_ALLOW_CREDENTIALS:-true}
-
-      # Server port
-      - conexao-de-sorte-server-port=${CONEXAO_DE_SORTE_SERVER_PORT:-8089}
+      - SPRING_PROFILES_ACTIVE=prod
+      - BATEPAPO_LOG_LEVEL=INFO
+      - LOGGING_LEVEL_ROOT=INFO
+    secrets:
+      - conexao-de-sorte-database-r2dbc-url
+      - conexao-de-sorte-database-username
+      - conexao-de-sorte-database-password
+      - conexao-de-sorte-redis-host
+      - conexao-de-sorte-redis-port
+      - conexao-de-sorte-redis-password
+      - conexao-de-sorte-redis-database
+      - conexao-de-sorte-jwt-issuer
+      - conexao-de-sorte-jwt-jwks-uri
+      - conexao-de-sorte-server-port
       
       # Features
       - FEATURE_BATEPAPO_MS=true
@@ -147,4 +139,26 @@ volumes:
 networks:
   conexao-network-swarm:
     name: conexao-network-swarm
+    external: true
+
+secrets:
+  conexao-de-sorte-database-r2dbc-url:
+    external: true
+  conexao-de-sorte-database-username:
+    external: true
+  conexao-de-sorte-database-password:
+    external: true
+  conexao-de-sorte-redis-host:
+    external: true
+  conexao-de-sorte-redis-port:
+    external: true
+  conexao-de-sorte-redis-password:
+    external: true
+  conexao-de-sorte-redis-database:
+    external: true
+  conexao-de-sorte-jwt-issuer:
+    external: true
+  conexao-de-sorte-jwt-jwks-uri:
+    external: true
+  conexao-de-sorte-server-port:
     external: true
