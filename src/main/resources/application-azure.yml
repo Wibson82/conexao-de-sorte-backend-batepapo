@@ -107,6 +107,23 @@ spring:
           issuer-uri: ${conexao-de-sorte-jwt-issuer}
           cache-duration: PT15M
 
+  # ========================================
+  # 🔧 CACHE CONFIGURATION
+  # ========================================
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000ms  # 5 minutos para chat
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "chat:"
+    cache-names:
+      - chat:mensagens
+      - chat:salas
+      - chat:usuarios-online
+      - chat:mensagens-recentes
+      - chat:salas-ativas
+
 # ========================================
 # 🌐 SERVER CONFIGURATION
 # ========================================
@@ -199,23 +216,6 @@ logging:
     max-size: ${LOG_FILE_MAX_SIZE:50MB}
     max-history: ${LOG_FILE_MAX_HISTORY:7}
 
-# ========================================
-# 🔧 CACHE CONFIGURATION
-# ========================================
-spring:
-  cache:
-    type: redis
-    redis:
-      time-to-live: 300000ms  # 5 minutos para chat
-      cache-null-values: false
-      use-key-prefix: true
-      key-prefix: "chat:"
-    cache-names:
-      - chat:mensagens
-      - chat:salas
-      - chat:usuarios-online
-      - chat:mensagens-recentes
-      - chat:salas-ativas
 
 # ========================================
 # 🌐 CORS CONFIGURATION
