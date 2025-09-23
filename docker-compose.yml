@@ -103,8 +103,13 @@ services:
     # 🏷️ TRAEFIK LABELS - BATEPAPO SERVICE
     # ==========================================================================
     labels:
-      # Habilitar Traefik para este serviço
-      - "traefik.enable=true"
+      # Habilitar descoberta pelo Gateway (não mais diretamente pelo Traefik)
+      - "traefik.enable=false"
+      - "gateway.enable=true"
+      - "gateway.service.name=conexao-batepapo"
+      - "gateway.service.port=8089"
+      - "gateway.service.path=/rest/batepapo"
+      - "gateway.health.path=/actuator/health"
       - "traefik.docker.network=conexao-network-swarm"
 
       # Configuração do serviço Batepapo
