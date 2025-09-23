@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    runs-on: [ self-hosted, Linux, X64, conexao, conexao-de-sorte-backend-batepapo ]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     permissions:
       id-token: write
