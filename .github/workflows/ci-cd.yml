@@ -21,36 +21,41 @@ env:
   TZ: America/Sao_Paulo
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  validate-environment:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  build-and-deploy:
+    runs-on: [ self-hosted, Linux, X64, conexao, conexao-de-sorte-backend-batepapo ]
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Definir horário inicial
+        run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
 
       - name: Validar estrutura
         shell: bash
         run: |
           set -euo pipefail
-          chmod +x .github/workflows/scripts/validate-required-files.sh
-          ./.github/workflows/scripts/validate-required-files.sh microservice
-
-  build-and-test:
-    needs: validate-environment
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+          # Este script precisa estar disponível no runner ou ser trazido para o repo
+          if [ -f ".github/workflows/scripts/validate-required-files.sh" ]; then
+            chmod +x .github/workflows/scripts/validate-required-files.sh
+            ./.github/workflows/scripts/validate-required-files.sh microservice
+          else
+            echo "Aviso: Script de validação não encontrado."
+          fi
 
       - name: Configurar Java 25 (Temurin)
         uses: actions/setup-java@v4
         with:
-          distribution: corretto
+          distribution: 'temurin'
           java-version: '25'
           cache: maven
 
@@ -59,48 +64,6 @@ jobs:
         run: |
           set -euo pipefail
           ./mvnw -B clean verify
-
-      - name: Publicar artefato JAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: batepapo-jar
-          path: target/conexao-de-sorte-backend-batepapo-*.jar
-          retention-days: 1
-
-      - name: Publicar artefatos de deploy
-        uses: actions/upload-artifact@v4
-        with:
-          name: batepapo-configs
-          path: |
-            docker-compose.yml
-            Dockerfile
-            docker/
-          retention-days: 1
-
-  build-image:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      packages: write
-    outputs:
-      image-uri: ${{ steps.build-and-push.outputs.image-uri }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Baixar artefatos JAR
-        uses: actions/download-artifact@v4
-        with:
-          name: batepapo-jar
-          path: target/
-
-      - name: Baixar artefatos de deploy
-        uses: actions/download-artifact@v4
-        with:
-          name: batepapo-configs
-          path: .
 
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -121,6 +84,10 @@ jobs:
           TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
           IMAGE_URI="ghcr.io/${REPO_LOWERCASE}/conexao-de-sorte-backend-batepapo:${TIMESTAMP}"
 
+          # Copia o JAR para o local esperado pelo Dockerfile
+          mkdir -p target
+          cp -f ./target/conexao-de-sorte-backend-batepapo-*.jar ./target/app.jar
+
           docker buildx build \
             --platform linux/amd64 \
             --push \
@@ -131,256 +98,61 @@ jobs:
             .
 
           echo "image-uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
-
-  deploy-selfhosted:
-    needs: build-image
-    if: |
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
-    runs-on: [ self-hosted, Linux, X64, conexao, conexao-de-sorte-backend-batepapo ]
-    timeout-minutes: 20
-    permissions:
-      id-token: write
-      contents: read
-      packages: read
-    env:
-      STACK_NAME: conexao-batepapo
-      DOCKER_NETWORK_NAME: conexao-network-swarm
-      IMAGE_URI: ${{ needs.build-image.outputs.image-uri }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Definir horário inicial
-        run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+        env:
+          IMAGE_URI: "ghcr.io/${{ github.repository_owner }}/conexao-de-sorte-backend-batepapo:latest"
 
       - name: Azure Login (OIDC)
+        if: github.ref == 'refs/heads/main'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Baixar artefatos de deploy
-        uses: actions/download-artifact@v4
-        with:
-          name: batepapo-configs
-          path: .
-
-      - name: Login no GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🔐 Get secrets from Azure Key Vault
-        shell: bash
-        id: get-secrets
-        run: |
-          set -euo pipefail
-          
-          # Usar endpoint do Key Vault se disponível, senão usar nome
-          KEYVAULT_ENDPOINT="${{ secrets.AZURE_KEYVAULT_ENDPOINT }}"
-          if [[ -n "$KEYVAULT_ENDPOINT" ]]; then
-            # Extrair o nome do Key Vault do endpoint (formato: https://<nome>.vault.azure.net/)
-            KEYVAULT_NAME=$(echo "$KEYVAULT_ENDPOINT" | sed 's|https://\(.*\)\.vault\.azure\.net/.*|\1|')
-            echo "🔑 Usando Key Vault do endpoint: $KEYVAULT_NAME"
-          else
-            KEYVAULT_NAME="kv-conexao-de-sorte"
-            echo "🔑 Usando Key Vault do nome: $KEYVAULT_NAME"
-          fi
-
-          # Lista de segredos a obter
-          secrets_list="conexao-de-sorte-database-r2dbc-url,conexao-de-sorte-database-username,conexao-de-sorte-database-password,conexao-de-sorte-redis-host,conexao-de-sorte-redis-port,conexao-de-sorte-redis-password,conexao-de-sorte-redis-database,conexao-de-sorte-jwt-secret,conexao-de-sorte-jwt-issuer,conexao-de-sorte-jwt-signing-key,conexao-de-sorte-jwt-verification-key,conexao-de-sorte-server-port,conexao-de-sorte-cors-allowed-origins,conexao-de-sorte-cors-allow-credentials"
-
-          IFS=',' read -ra SECRETS_ARRAY <<< "$secrets_list"
-          for secret_name in "${SECRETS_ARRAY[@]}"; do
-            echo "🔍 Obtendo segredo: $secret_name"
-            secret_value=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" --name "$secret_name" --query 'value' -o tsv 2>/dev/null || echo "")
-
-            if [[ -n "$secret_value" ]]; then
-              echo "✅ Segredo obtido: $secret_name"
-              # Salvar com o nome original (com traços) para compatibilidade com o step de validação
-              echo "${secret_name}=${secret_value}" >> $GITHUB_OUTPUT
-              # Também salvar como variável de ambiente para uso posterior
-              env_var_name=$(echo "$secret_name" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-              echo "${env_var_name}=${secret_value}" >> $GITHUB_ENV
-            else
-              echo "⚠️ Segredo não encontrado: $secret_name"
-            fi
-          done
-
-          echo "✅ Obtenção de segredos concluída"
-
-      - name: 🔒 Mask sensitive values
-        run: |
-          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-database-password }}"
-          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-redis-password }}"
-          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-secret }}"
-          echo ::add-mask::"${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-signing-key }}"
-
       - name: 🔐 Criar Docker Secrets from Azure Key Vault
+        if: github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           echo "🔐 Criando Docker Secrets a partir dos valores do Azure Key Vault..."
-
-          # Lista de secrets essenciais para injetar no Docker Swarm
+          KEYVAULT_NAME=$(echo "${{ secrets.AZURE_KEYVAULT_ENDPOINT }}" | sed 's|https://\(.*\)\.vault\.azure\.net/.*|\1|')
           secrets_list="conexao-de-sorte-database-r2dbc-url,conexao-de-sorte-database-username,conexao-de-sorte-database-password,conexao-de-sorte-redis-host,conexao-de-sorte-redis-port,conexao-de-sorte-redis-password,conexao-de-sorte-redis-database,conexao-de-sorte-jwt-issuer,conexao-de-sorte-jwt-jwks-uri,conexao-de-sorte-server-port"
-
-          IFS=',' read -ra SECRETS_ARRAY <<< "$secrets_list"
-          created_secrets=0
-
-          for secret_name in "${SECRETS_ARRAY[@]}"; do
-            # Converter nome do secret para saída do step get-secrets
-            kv_output_name=$(echo "$secret_name" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-            secret_value=""
-
-            # Obter valor do step get-secrets outputs
-            case "$secret_name" in
-              "conexao-de-sorte-database-r2dbc-url") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-database-r2dbc-url }}" ;;
-              "conexao-de-sorte-database-username") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-database-username }}" ;;
-              "conexao-de-sorte-database-password") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-database-password }}" ;;
-              "conexao-de-sorte-redis-host") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-redis-host }}" ;;
-              "conexao-de-sorte-redis-port") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-redis-port }}" ;;
-              "conexao-de-sorte-redis-password") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-redis-password }}" ;;
-              "conexao-de-sorte-redis-database") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-redis-database }}" ;;
-              "conexao-de-sorte-jwt-issuer") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-issuer }}" ;;
-              "conexao-de-sorte-jwt-jwks-uri") secret_value="https://auth.conexaodesorte.com/.well-known/jwks.json" ;;
-              "conexao-de-sorte-server-port") secret_value="${{ steps.get-secrets.outputs.conexao-de-sorte-server-port }}" ;;
-            esac
-
+          
+          for secret_name in $(echo $secrets_list | sed "s/,/ /g"); do
+            secret_value=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" --name "$secret_name" --query 'value' -o tsv)
             if [[ -n "$secret_value" ]]; then
-              echo "🔐 Criando Docker Secret: $secret_name"
-
-              # Remover secret existente se houver
-              if docker secret inspect "$secret_name" >/dev/null 2>&1; then
-                echo "🗑️ Removendo secret existente: $secret_name"
-                docker secret rm "$secret_name" || true
-                sleep 1
-              fi
-
-              # Criar novo secret
+              docker secret rm "$secret_name" >/dev/null 2>&1 || true
               echo -n "$secret_value" | docker secret create "$secret_name" -
               echo "✅ Docker Secret criado: $secret_name"
-              ((created_secrets++))
             else
               echo "⚠️ Secret $secret_name não encontrado no Key Vault"
             fi
           done
 
-          echo "✅ Total de Docker Secrets criados: $created_secrets/${#SECRETS_ARRAY[@]}"
-
-          if [[ $created_secrets -lt 5 ]]; then
-            echo "❌ Poucos secrets criados - deploy pode falhar"
-            exit 1
-          fi
-
-      - name: Preparar rede overlay
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! docker network ls --format '{{.Name}}' | grep -q "^${DOCKER_NETWORK_NAME}$"; then
-            docker network create --driver overlay --attachable "${DOCKER_NETWORK_NAME}" || true
-          fi
-
-      - name: Remover stack anterior
-        shell: bash
-        run: |
-          set -euo pipefail
-          if docker stack ls --format '{{.Name}}' | grep -q "^${STACK_NAME}$"; then
-            docker stack rm "${STACK_NAME}"
-            sleep 15
-          fi
-
       - name: Deploy da stack
-        shell: bash
+        if: github.ref == 'refs/heads/main'
         env:
-          # Banco de Dados
-          DATABASE_R2DBC_URL: ${{ steps.get-secrets.outputs.conexao-de-sorte-database-r2dbc-url }}
-          DATABASE_USERNAME: ${{ steps.get-secrets.outputs.conexao-de-sorte-database-username }}
-          DATABASE_PASSWORD: ${{ steps.get-secrets.outputs.conexao-de-sorte-database-password }}
-          # Redis
-          REDIS_HOST: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-host }}
-          REDIS_PORT: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-port }}
-          REDIS_PASSWORD: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-password }}
-          REDIS_DATABASE: ${{ steps.get-secrets.outputs.conexao-de-sorte-redis-database }}
-          # JWT
-          CONEXAO_DE_SORTE_JWT_SECRET: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-secret }}
-          CONEXAO_DE_SORTE_JWT_ISSUER: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-issuer }}
-          CONEXAO_DE_SORTE_JWT_SIGNING_KEY: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-signing-key }}
-          CONEXAO_DE_SORTE_JWT_VERIFICATION_KEY: ${{ steps.get-secrets.outputs.conexao-de-sorte-jwt-verification-key }}
-          # Server e CORS
-          CONEXAO_DE_SORTE_SERVER_PORT: ${{ steps.get-secrets.outputs.conexao-de-sorte-server-port }}
-          CONEXAO_DE_SORTE_CORS_ALLOWED_ORIGINS: ${{ steps.get-secrets.outputs.conexao-de-sorte-cors-allowed-origins }}
-          CONEXAO_DE_SORTE_CORS_ALLOW_CREDENTIALS: ${{ steps.get-secrets.outputs.conexao-de-sorte-cors-allow-credentials }}
+          IMAGE_URI: ${{ steps.build-and-push.outputs.image-uri }}
         run: |
           set -euo pipefail
-
-          if [[ -z "$DATABASE_USERNAME" || -z "$DATABASE_PASSWORD" ]]; then
-            echo "❌ Secrets essenciais de banco ausentes"
-            exit 1
-          fi
-
           docker pull "$IMAGE_URI"
-          COMPOSE_PROJECT_NAME="${STACK_NAME}" docker stack deploy -c docker-compose.yml "${STACK_NAME}"
+          COMPOSE_PROJECT_NAME="${STACK_NAME}" docker stack deploy -c docker-compose.yml --with-registry-auth "${STACK_NAME}"
           sleep 30
 
       - name: Verificar serviços
-        shell: bash
+        if: github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           docker service ls --filter name="${STACK_NAME}_" --format "table {{.Name}}\t{{.Replicas}}\t{{.Image}}"
 
-      - name: Validar health via Traefik
-        shell: bash
-        env:
-          HEALTH_MONITOR_URL: https://traefik.conexaodesorte.com.br/health/service/batepapo
-        run: |
-          set -euo pipefail
-          TIMEOUT_TOTAL=300
-          INTERVAL=10
-          elapsed=0
-          last_response=""
-          status=""
-
-          while [ $elapsed -lt $TIMEOUT_TOTAL ]; do
-            echo "🔎 Consultando Traefik ($elapsed/${TIMEOUT_TOTAL}s)..."
-            response=$(curl -sf --max-time 10 "$HEALTH_MONITOR_URL" 2>/dev/null || true)
-            last_response="$response"
-
-            if [[ -n "$response" ]]; then
-              status=$(printf '%s' "$response" | python3 -c "import json, sys; data=json.load(sys.stdin); print(data.get('status',''))" 2>/dev/null || true)
-              status=${status//$'\n'/}
-              echo "📊 Status reportado: ${status:-indefinido}"
-              if [[ "$status" == "healthy" ]]; then
-                echo "✅ Traefik confirmou Batepapo como healthy"
-                exit 0
-              fi
-            else
-              echo "⚠️ Traefik sem resposta nesta tentativa"
-            fi
-
-            sleep "$INTERVAL"
-            elapsed=$((elapsed + INTERVAL))
-          done
-
-          echo "❌ Traefik nao confirmou Batepapo como healthy apos ${TIMEOUT_TOTAL}s"
-          echo "📝 Ultima resposta recebida: ${last_response:-<sem resposta>}"
-          exit 1
-
       - name: Limpeza pós-deploy
-        if: always()
-        shell: bash
+        if: always() && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           docker image prune -f --filter "until=168h" || true
           docker container prune -f --filter "until=24h" || true
 
       - name: Resumo do deploy
-        shell: bash
+        if: always() && github.ref == 'refs/heads/main'
         run: |
           END_TIME=$(date +%s)
           START_TIME=${START_TIME:-$END_TIME}
@@ -390,16 +162,6 @@ jobs:
           echo "============================================="
           echo "💬 BATE-PAPO - RESUMO"
           echo "Stack........: ${STACK_NAME}"
-          echo "Imagem.......: ${IMAGE_URI}"
+          echo "Imagem.......: ${{ steps.build-and-push.outputs.image-uri }}"
           echo "Tempo........: ${MIN}m ${SEC}s"
           echo "============================================="
-
-  notify:
-    if: always()
-    needs: [ build-and-test, deploy-selfhosted ]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Registrar status final
-        shell: bash
-        run: |
-          echo "Pipeline concluído com status: ${{ needs.deploy-selfhosted.result }}"

@@ -111,7 +111,7 @@ spring:
 # 🌐 SERVER CONFIGURATION
 # ========================================
 server:
-  port: ${conexao-de-sorte-server-port:8079}
+  port: ${SERVER_PORT:8090}
   shutdown: graceful
   ssl:
     enabled: false  # TLS termination no Traefik
