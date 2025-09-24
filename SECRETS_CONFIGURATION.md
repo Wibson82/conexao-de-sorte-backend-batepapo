@@ -31,7 +31,7 @@ Configure os seguintes segredos no Azure Key Vault:
 conexao-de-sorte-database-r2dbc-url    # URL R2DBC: r2dbc:pool:mysql://host:3306/database
 conexao-de-sorte-database-username     # Username do banco
 conexao-de-sorte-database-password     # Senha do banco
-conexao-de-sorte-database-flyway-url   # URL Flyway: jdbc:mysql://host:3306/database
+conexao-de-sorte-database-jdbc-url     # URL JDBC/Flyway: jdbc:mysql://host:3306/database
 ```
 
 ### 🔐 JWT Authentication
