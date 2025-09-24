@@ -21,6 +21,11 @@ services:
       - SPRING_PROFILES_ACTIVE=prod
       - BATEPAPO_LOG_LEVEL=INFO
       - LOGGING_LEVEL_ROOT=INFO
+      # Features
+      - FEATURE_BATEPAPO_MS=true
+      - FEATURE_WEBSOCKET=true
+      - FEATURE_SSE=true
+      - FEATURE_MESSAGE_PERSISTENCE=true
       # Database Configuration
       - DATABASE_HOST=conexao-mysql
       - DATABASE_PORT=3306
@@ -40,12 +45,6 @@ services:
       - conexao-de-sorte-jwt-issuer
       - conexao-de-sorte-jwt-jwks-uri
       - conexao-de-sorte-server-port
-      
-      # Features
-      - FEATURE_BATEPAPO_MS=true
-      - FEATURE_WEBSOCKET=true
-      - FEATURE_SSE=true
-      - FEATURE_MESSAGE_PERSISTENCE=true
       - FEATURE_REDIS_STREAMS=true
       - FEATURE_USER_PRESENCE=true
       - FEATURE_MESSAGE_HISTORY=true
