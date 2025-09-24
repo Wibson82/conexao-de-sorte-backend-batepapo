@@ -34,7 +34,8 @@ spring:
   # Redis para cache (Bate-papo usa DB 4) - Configuração principal na seção data:redis mais completa
   r2dbc:
     # Padrão concatenação: secret base + parâmetros específicos
-    url: ${conexao-de-sorte-database-r2dbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo
+    # createDatabaseIfNotExist=true permite criar o banco automaticamente
+    url: ${conexao-de-sorte-database-r2dbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
     username: ${conexao-de-sorte-database-username}
     password: ${conexao-de-sorte-database-password}
     pool:
@@ -48,7 +49,8 @@ spring:
   flyway:
     enabled: true
     # Padrão concatenação: secret base + parâmetros específicos
-    url: ${conexao-de-sorte-database-jdbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo
+    # createDatabaseIfNotExist=true permite criar o banco automaticamente
+    url: ${conexao-de-sorte-database-jdbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
     user: ${conexao-de-sorte-database-username}
     password: ${conexao-de-sorte-database-password}
     locations: classpath:db/migration

@@ -48,7 +48,8 @@ spring:
   # 🗄️ DATABASE CONFIGURATION
   # ========================================
   r2dbc:
-    url: ${conexao-de-sorte-database-r2dbc-url}
+    # createDatabaseIfNotExist=true permite criar o banco automaticamente
+    url: ${conexao-de-sorte-database-r2dbc-url}/conexao_sorte_chat?createDatabaseIfNotExist=true
     username: ${conexao-de-sorte-database-username}
     password: ${conexao-de-sorte-database-password}
     pool:
@@ -62,7 +63,8 @@ spring:
 
   flyway:
     enabled: true
-    url: ${conexao-de-sorte-database-jdbc-url}
+    # createDatabaseIfNotExist=true permite criar o banco automaticamente
+    url: ${conexao-de-sorte-database-jdbc-url}/conexao_sorte_chat?createDatabaseIfNotExist=true
     user: ${conexao-de-sorte-database-username}
     password: ${conexao-de-sorte-database-password}
     locations: classpath:db/migration
