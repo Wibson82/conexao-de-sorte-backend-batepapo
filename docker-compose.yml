@@ -30,6 +30,19 @@ services:
       - FEATURE_USER_PRESENCE=true
       - FEATURE_MESSAGE_HISTORY=true
       - FEATURE_ROOM_MANAGEMENT=true
+      - FEATURE_AUDIT_LOGGING=true
+      - FEATURE_METRICS=true
+      # Chat Configuration
+      - CHAT_MAX_MESSAGE_LENGTH=500
+      - CHAT_MESSAGE_RETENTION_DAYS=30
+      - CHAT_ONLINE_TIMEOUT_MINUTES=5
+      - CHAT_HEARTBEAT_INTERVAL_SECONDS=30
+      - CHAT_MAX_CONNECTIONS_PER_USER=3
+      # Observability
+      - TRACING_PROBABILITY=1.0
+      - LOG_LEVEL=INFO
+      # Performance
+      - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
       # Database Configuration
       - DATABASE_HOST=conexao-mysql
       - DATABASE_PORT=3306
@@ -49,22 +62,6 @@ services:
       - conexao-de-sorte-jwt-issuer
       - conexao-de-sorte-jwt-jwks-uri
       - conexao-de-sorte-server-port
-      - FEATURE_AUDIT_LOGGING=true
-      - FEATURE_METRICS=true
-      
-      # Chat Configuration
-      - CHAT_MAX_MESSAGE_LENGTH=500
-      - CHAT_MESSAGE_RETENTION_DAYS=30
-      - CHAT_ONLINE_TIMEOUT_MINUTES=5
-      - CHAT_HEARTBEAT_INTERVAL_SECONDS=30
-      - CHAT_MAX_CONNECTIONS_PER_USER=3
-      
-      # Observability
-      - TRACING_PROBABILITY=1.0
-      - LOG_LEVEL=INFO
-      
-      # Performance
-      - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8089/actuator/health"]
       interval: 30s
