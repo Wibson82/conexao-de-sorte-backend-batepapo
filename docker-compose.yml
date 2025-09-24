@@ -26,6 +26,10 @@ services:
       - FEATURE_WEBSOCKET=true
       - FEATURE_SSE=true
       - FEATURE_MESSAGE_PERSISTENCE=true
+      - FEATURE_REDIS_STREAMS=true
+      - FEATURE_USER_PRESENCE=true
+      - FEATURE_MESSAGE_HISTORY=true
+      - FEATURE_ROOM_MANAGEMENT=true
       # Database Configuration
       - DATABASE_HOST=conexao-mysql
       - DATABASE_PORT=3306
@@ -45,10 +49,6 @@ services:
       - conexao-de-sorte-jwt-issuer
       - conexao-de-sorte-jwt-jwks-uri
       - conexao-de-sorte-server-port
-      - FEATURE_REDIS_STREAMS=true
-      - FEATURE_USER_PRESENCE=true
-      - FEATURE_MESSAGE_HISTORY=true
-      - FEATURE_ROOM_MANAGEMENT=true
       - FEATURE_AUDIT_LOGGING=true
       - FEATURE_METRICS=true
       
