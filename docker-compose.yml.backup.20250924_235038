@@ -1,0 +1,176 @@
+# ============================================================================
+# 🐳 DOCKER COMPOSE - AMBIENTE COMPLETO BATE-PAPO
+# ============================================================================
+# 
+# Microserviço bate-papo conectado ao infraestrutura-core:
+# - MySQL 8.0 local com R2DBC
+# - Redis do infraestrutura-core para cache e streams
+# - Rede conexao-network-swarm
+# 
+# Uso: docker-compose up -d
+# ============================================================================
+
+
+services:
+  # ========================================
+  # 💬 MICROSERVIÇO BATE-PAPO
+  # ========================================
+  batepapo:
+    image: ghcr.io/wibson82/conexao-de-sorte-backend-batepapo:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - BATEPAPO_LOG_LEVEL=INFO
+      - LOGGING_LEVEL_ROOT=INFO
+      # Features
+      - FEATURE_BATEPAPO_MS=true
+      - FEATURE_WEBSOCKET=true
+      - FEATURE_SSE=true
+      - FEATURE_MESSAGE_PERSISTENCE=true
+      - FEATURE_REDIS_STREAMS=true
+      - FEATURE_USER_PRESENCE=true
+      - FEATURE_MESSAGE_HISTORY=true
+      - FEATURE_ROOM_MANAGEMENT=true
+      - FEATURE_AUDIT_LOGGING=true
+      - FEATURE_METRICS=true
+      # Chat Configuration
+      - CHAT_MAX_MESSAGE_LENGTH=500
+      - CHAT_MESSAGE_RETENTION_DAYS=30
+      - CHAT_ONLINE_TIMEOUT_MINUTES=5
+      - CHAT_HEARTBEAT_INTERVAL_SECONDS=30
+      - CHAT_MAX_CONNECTIONS_PER_USER=3
+      # Observability
+      - TRACING_PROBABILITY=1.0
+      - LOG_LEVEL=INFO
+      # Performance
+      - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+      # Database Configuration
+      - DATABASE_HOST=conexao-mysql
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=conexao_de_sorte
+      - DATABASE_USERNAME=conexao
+      # Secrets via Docker Secrets
+      - DATABASE_PASSWORD_FILE=/run/secrets/DATABASE_PASSWORD
+    secrets:
+      - conexao-de-sorte-database-r2dbc-url
+      - conexao-de-sorte-database-username
+      - conexao-de-sorte-database-password
+      - DATABASE_PASSWORD
+      - conexao-de-sorte-redis-host
+      - conexao-de-sorte-redis-port
+      - conexao-de-sorte-redis-password
+      - conexao-de-sorte-redis-database
+      - conexao-de-sorte-jwt-issuer
+      - conexao-de-sorte-jwt-jwks-uri
+      - conexao-de-sorte-server-port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      conexao-network-swarm:
+        aliases:
+          - conexao-batepapo
+    volumes:
+      - batepapo-logs:/app/logs
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      placement:
+        constraints:
+          - node.role == worker
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+    # ==========================================================================
+    # 🏷️ TRAEFIK LABELS - BATEPAPO SERVICE
+    # ==========================================================================
+    labels:
+      # Habilitar descoberta pelo Gateway (não mais diretamente pelo Traefik)
+      - "traefik.enable=false"
+      - "gateway.enable=true"
+      - "gateway.service.name=conexao-batepapo"
+      - "gateway.service.port=8089"
+      - "gateway.service.path=/rest/batepapo"
+      - "gateway.health.path=/actuator/health"
+      - "traefik.docker.network=conexao-network-swarm"
+
+      # Configuração do serviço Batepapo
+      - "traefik.http.services.batepapo-service.loadbalancer.server.port=8089"
+      - "traefik.http.services.batepapo-service.loadbalancer.healthcheck.path=/actuator/health"
+      - "traefik.http.services.batepapo-service.loadbalancer.healthcheck.interval=30s"
+
+      # Health check individual do Batepapo
+      - "traefik.http.routers.batepapo-health.rule=Host(`traefik.conexaodesorte.com.br`) && PathPrefix(`/health/service/batepapo`)"
+      - "traefik.http.routers.batepapo-health.entrypoints=websecure"
+      - "traefik.http.routers.batepapo-health.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.batepapo-health.service=batepapo-service"
+      - "traefik.http.routers.batepapo-health.middlewares=batepapo-health-rewrite"
+
+      # Middleware para reescrever path do health check
+      - "traefik.http.middlewares.batepapo-health-rewrite.replacepath.path=/actuator/health"
+
+      # Metadata do serviço
+      - "org.opencontainers.image.title=Conexão de Sorte - Bate-papo"
+      - "org.opencontainers.image.description=Microserviço de chat em tempo real com WebSocket"
+      - "org.opencontainers.image.version=1.0.0"
+      - "microservice.type=chat"
+      - "microservice.category=communication"
+
+  # ========================================
+  # 🗄️ OBSERVAÇÃO: MySQL removido - usa infraestrutura centralizada
+  # ========================================
+  # MySQL agora fornecido pelo conexao-de-sorte-infraestrutura-core
+  # Database: conexao_chat no servidor conexao-mysql
+
+# ========================================
+# 💾 VOLUMES PERSISTENTES
+# ========================================
+volumes:
+  batepapo-logs:
+
+# ========================================
+# 🌐 REDE EXTERNA
+# ========================================
+networks:
+  conexao-network-swarm:
+    name: conexao-network-swarm
+    external: true
+
+secrets:
+  conexao-de-sorte-database-r2dbc-url:
+    external: true
+  conexao-de-sorte-database-username:
+    external: true
+  conexao-de-sorte-database-password:
+    external: true
+  conexao-de-sorte-redis-host:
+    external: true
+  conexao-de-sorte-redis-port:
+    external: true
+  conexao-de-sorte-redis-password:
+    external: true
+  conexao-de-sorte-redis-database:
+    external: true
+  conexao-de-sorte-jwt-issuer:
+    external: true
+  conexao-de-sorte-jwt-jwks-uri:
+    external: true
+  conexao-de-sorte-server-port:
+    external: true
+  DATABASE_PASSWORD:
+    external: true
+    name: DATABASE_PASSWORD

@@ -1,0 +1,167 @@
+server:
+  port: ${SERVER_PORT:8090}  # Porta oficial Bate-papo
+  shutdown: graceful
+  ssl:
+    enabled: ${conexao-de-sorte-ssl-enabled:false}
+    key-store: ${conexao-de-sorte-ssl-keystore-path:}
+    key-store-password: ${conexao-de-sorte-ssl-keystore-password:}
+    key-store-type: PKCS12
+  netty:
+    connection-timeout: 20s
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+spring:
+  config:
+    import: optional:configtree:/run/secrets/
+  application:
+    name: conexao-batepapo
+  profiles:
+    default: prod
+  main:
+    allow-bean-definition-overriding: true
+    
+  # Azure Key Vault (configuração base)
+  cloud:
+    azure:
+      keyvault:
+        secret:
+          enabled: ${AZURE_KEYVAULT_ENABLED:false}
+
+  # Redis para cache (Bate-papo usa DB 4) - Configuração principal na seção data:redis mais completa
+  r2dbc:
+    # Padrão concatenação: secret base + parâmetros específicos
+    # createDatabaseIfNotExist=true permite criar o banco automaticamente
+    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:mysql://conexao-mysql:3306}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
+    username: ${conexao-de-sorte-database-username:conexao_user}
+    password: ${conexao-de-sorte-database-password:conexao_password}
+    pool:
+      initial-size: 1
+      max-size: 15
+      max-idle-time: 30m
+      max-acquire-time: 15s
+      max-create-connection-time: 10s
+      max-life-time: 60m
+      validation-query: SELECT 1
+  flyway:
+    enabled: true
+    # Padrão concatenação: secret base + parâmetros específicos
+    # createDatabaseIfNotExist=true permite criar o banco automaticamente
+    url: ${conexao-de-sorte-database-jdbc-url:jdbc:mysql://conexao-mysql:3306}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
+    user: ${conexao-de-sorte-database-username:conexao_user}
+    password: ${conexao-de-sorte-database-password:conexao_password}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: false
+  data:
+    redis:
+      host: ${conexao-de-sorte-redis-host:conexao-redis}
+      port: ${conexao-de-sorte-redis-port:6379}
+      password: ${conexao-de-sorte-redis-password:senha_teste}
+      database: ${conexao-de-sorte-redis-database:4}
+      timeout: 3000ms
+      connect-timeout: 10000ms
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 30
+          max-idle: 10
+          min-idle: 5
+          max-wait: 3000ms
+          time-between-eviction-runs: 60000ms
+        cluster:
+          refresh:
+            adaptive: true
+            period: 30s
+      client-type: lettuce
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000ms
+      cache-null-values: false
+      use-key-prefix: true
+    cache-names:
+      - chat:mensagens
+      - chat:salas
+      - chat:usuarios-online
+      - chat:mensagens-recentes
+      - chat:salas-ativas
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8081/.well-known/jwks.json}
+          issuer-uri: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
+  jackson:
+    time-zone: America/Sao_Paulo
+    locale: pt_BR
+
+# Configurações de serviços externos
+services:
+  auth:
+    url: ${conexao-de-sorte-auth-service-url:http://localhost:8081}
+    endpoints:
+      validate: /rest/v1/auth/validate
+      users: /rest/v1/users
+    timeout: 5s
+    retry:
+      max-attempts: 3
+      delay: 1s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+      cors:
+        allowed-origins: "*"
+        allowed-methods: GET
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      probes:
+        enabled: true
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles:
+        "[http.server.requests]": 0.5,0.95,0.99
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+        step: 60s
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${TRACING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+  show-actuator: false
+
+# Production configuration optimizations
+batepapo:
+  production:
+    pool-size-max: 50
+    clean-disabled: true
+    log-level: INFO
