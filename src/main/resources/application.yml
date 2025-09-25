@@ -35,9 +35,9 @@ spring:
   r2dbc:
     # Padrão concatenação: secret base + parâmetros específicos
     # createDatabaseIfNotExist=true permite criar o banco automaticamente
-    url: ${conexao-de-sorte-database-r2dbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
-    username: ${conexao-de-sorte-database-username}
-    password: ${conexao-de-sorte-database-password}
+    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:mysql://conexao-mysql:3306}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
+    username: ${conexao-de-sorte-database-username:conexao_user}
+    password: ${conexao-de-sorte-database-password:conexao_password}
     pool:
       initial-size: 1
       max-size: 15
@@ -50,9 +50,9 @@ spring:
     enabled: true
     # Padrão concatenação: secret base + parâmetros específicos
     # createDatabaseIfNotExist=true permite criar o banco automaticamente
-    url: ${conexao-de-sorte-database-jdbc-url}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
-    user: ${conexao-de-sorte-database-username}
-    password: ${conexao-de-sorte-database-password}
+    url: ${conexao-de-sorte-database-jdbc-url:jdbc:mysql://conexao-mysql:3306}/conexao_sorte_chat?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=America/Sao_Paulo&createDatabaseIfNotExist=true
+    user: ${conexao-de-sorte-database-username:conexao_user}
+    password: ${conexao-de-sorte-database-password:conexao_password}
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
